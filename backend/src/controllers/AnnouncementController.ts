@@ -146,6 +146,22 @@ export const findList = async (
   return res.status(200).json(records);
 };
 
+export const getAnnouncementsForCompany = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { searchParam, pageNumber } = req.query as IndexQuery;
+  const { companyId } = req.user;
+
+  const { records, count, hasMore } = await ListService({
+    searchParam,
+    pageNumber,
+    userCompanyId: companyId // Novo parâmetro
+  });
+
+  return res.json({ records, count, hasMore });
+};
+
 export const mediaUpload = async (
   req: Request,
   res: Response

@@ -6,8 +6,10 @@ import {
   AutoIncrement,
   DataType,
   CreatedAt,
-  UpdatedAt
+  UpdatedAt,
+  HasMany
 } from "sequelize-typescript";
+import { FlowCampaignModel } from "./FlowCampaign";
 
 @Table({
   tableName: "FlowBuilders"
@@ -33,9 +35,13 @@ export class FlowBuilderModel extends Model<FlowBuilderModel> {
   @Column(DataType.JSON)
   flow: {} | null;
 
+  @HasMany(() => FlowCampaignModel, 'flowId')
+  campaigns: FlowCampaignModel[];
+
   @CreatedAt
   createdAt: Date;
 
   @UpdatedAt
   updatedAt: Date;
 }
+export default FlowBuilderModel;

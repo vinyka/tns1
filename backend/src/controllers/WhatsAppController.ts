@@ -6,7 +6,11 @@ import Whatsapp from "../models/Whatsapp";
 import AppError from "../errors/AppError";
 import DeleteBaileysService from "../services/BaileysServices/DeleteBaileysService";
 import ShowCompanyService from "../services/CompanyService/ShowCompanyService";
-import { getAccessTokenFromPage, getPageProfile, subscribeApp } from "../services/FacebookServices/graphAPI";
+import {
+  getAccessTokenFromPage,
+  getPageProfile,
+  subscribeApp
+} from "../services/FacebookServices/graphAPI";
 import ShowPlanService from "../services/PlanService/ShowPlanService";
 import { StartWhatsAppSession } from "../services/WbotServices/StartWhatsAppSession";
 
@@ -21,6 +25,21 @@ import UpdateWhatsAppServiceAdmin from "../services/WhatsappService/UpdateWhatsA
 import ListAllWhatsAppsService from "../services/WhatsappService/ListAllWhatsAppService";
 import ListFilterWhatsAppsService from "../services/WhatsappService/ListFilterWhatsAppsService";
 import User from "../models/User";
+import logger from "../utils/logger";
+import {
+  CreateCompanyConnectionOficial,
+  DeleteConnectionWhatsAppOficial,
+  getTemplatesWhatsAppOficial,
+  UpdateConnectionWhatsAppOficial
+} from "../libs/whatsAppOficial/whatsAppOficial.service";
+import {
+  ICreateConnectionWhatsAppOficialCompany,
+  ICreateConnectionWhatsAppOficialWhatsApp,
+  IUpdateonnectionWhatsAppOficialWhatsApp
+} from "../libs/whatsAppOficial/IWhatsAppOficial.interfaces";
+import QuickMessageComponent from "../models/QuickMessageComponent";
+import CreateService from "../services/QuickMessageService/CreateService";
+import QuickMessage from "../models/QuickMessage";
 
 interface WhatsappData {
   name: string;
@@ -57,8 +76,15 @@ interface WhatsappData {
   collectiveVacationStart?: string;
   collectiveVacationEnd?: string;
   queueIdImportMessages?: number;
-  flowIdNotPhrase?: number;
-  flowIdWelcome?: number;
+  phone_number_id?: string;
+  waba_id?: string;
+  send_token?: string;
+  business_id?: string;
+  phone_number?: string;
+  waba_webhook?: string;
+  channel?: string;
+  triggerIntegrationOnClose?: boolean;
+  color?: string;
 }
 
 interface QueryParams {
@@ -74,11 +100,18 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   return res.status(200).json(whatsapps);
 };
 
-export const indexFilter = async (req: Request, res: Response): Promise<Response> => {
+export const indexFilter = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   const { companyId } = req.user;
   const { session, channel } = req.query as QueryParams;
 
-  const whatsapps = await ListFilterWhatsAppsService({ companyId, session, channel });
+  const whatsapps = await ListFilterWhatsAppsService({
+    companyId,
+    session,
+    channel
+  });
 
   return res.status(200).json(whatsapps);
 };
@@ -118,12 +151,18 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     collectiveVacationMessage,
     collectiveVacationStart,
     queueIdImportMessages,
-    flowIdNotPhrase,
-    flowIdWelcome
+    phone_number_id,
+    waba_id,
+    send_token,
+    business_id,
+    phone_number,
+    color,
+    waba_webhook,
+    channel
   }: WhatsappData = req.body;
   const { companyId } = req.user;
 
-  const company = await ShowCompanyService(companyId)
+  const company = await ShowCompanyService(companyId);
   const plan = await ShowPlanService(company.planId);
 
   if (!plan.useWhatsapp) {
@@ -131,10 +170,6 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
       error: "Você não possui permissão para acessar este recurso!"
     });
   }
-
-  console.log("================ WhatsAppController ==============")
-  console.log(req.body)
-  console.log("==================================================")
 
   const { whatsapp, oldDefaultWhatsapp } = await CreateWhatsAppService({
     name,
@@ -171,29 +206,69 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     collectiveVacationMessage,
     collectiveVacationStart,
     queueIdImportMessages,
-    flowIdNotPhrase,
-    flowIdWelcome
+    phone_number_id,
+    waba_id,
+    send_token,
+    business_id,
+    phone_number,
+    waba_webhook,
+    channel,
+    color
   });
 
-  StartWhatsAppSession(whatsapp, companyId);
+  if (["whatsapp_oficial"].includes(whatsapp.channel)) {
+    try {
+      const company: ICreateConnectionWhatsAppOficialCompany = {
+        companyId: String(whatsapp.companyId),
+        companyName: whatsapp.company.name
+      };
+      const whatsappOficial: ICreateConnectionWhatsAppOficialWhatsApp = {
+        token_mult100: whatsapp.token,
+        phone_number_id: whatsapp.phone_number_id,
+        waba_id: whatsapp.waba_id,
+        send_token: whatsapp.send_token,
+        business_id: whatsapp.business_id,
+        phone_number: whatsapp.phone_number,
+        idEmpresaMult100: whatsapp.companyId
+      };
 
+      const data = {
+        email: whatsapp.company.email,
+        company,
+        whatsApp: whatsappOficial
+      };
+
+      const { webhookLink, connectionId } =
+        await CreateCompanyConnectionOficial(data);
+
+      if (webhookLink) {
+        whatsapp.waba_webhook = webhookLink;
+        whatsapp.waba_webhook_id = connectionId;
+        whatsapp.status = "CONNECTED";
+        await whatsapp.save();
+      }
+    } catch (error) {
+      logger.info("ERROR", error);
+    }
+  }
+
+  if (["whatsapp"].includes(whatsapp.channel)) {
+    StartWhatsAppSession(whatsapp, companyId);
+  }
   const io = getIO();
-  io.of(String(companyId))
-    .emit(`company-${companyId}-whatsapp`, {
-      action: "update",
-      whatsapp
-    });
+  io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+    action: "update",
+    whatsapp
+  });
 
   if (oldDefaultWhatsapp) {
-    io.of(String(companyId))
-      .emit(`company-${companyId}-whatsapp`, {
-        action: "update",
-        whatsapp: oldDefaultWhatsapp
-      });
+    io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+      action: "update",
+      whatsapp: oldDefaultWhatsapp
+    });
   }
 
   return res.status(200).json(whatsapp);
-
 };
 
 export const storeFacebook = async (
@@ -237,7 +312,11 @@ export const storeFacebook = async (
       const acessTokenPage = await getAccessTokenFromPage(access_token);
 
       if (instagram_business_account && addInstagram) {
-        const { id: instagramId, username, name: instagramName } = instagram_business_account;
+        const {
+          id: instagramId,
+          username,
+          name: instagramName
+        } = instagram_business_account;
 
         pages.push({
           companyId,
@@ -293,11 +372,9 @@ export const storeFacebook = async (
 
         await subscribeApp(page.id, acessTokenPage);
       }
-
     }
 
     for await (const pageConection of pages) {
-
       const exist = await Whatsapp.findOne({
         where: {
           facebookPageUserId: pageConection.facebookPageUserId
@@ -313,12 +390,10 @@ export const storeFacebook = async (
       if (!exist) {
         const { whatsapp } = await CreateWhatsAppService(pageConection);
 
-        io.of(String(companyId))
-          .emit(`company-${companyId}-whatsapp`, {
-            action: "update",
-            whatsapp
-          });
-
+        io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+          action: "update",
+          whatsapp
+        });
       }
     }
     return res.status(200);
@@ -338,7 +413,6 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   // console.log("SHOWING WHATSAPP", whatsappId)
   const whatsapp = await ShowWhatsAppService(whatsappId, companyId, session);
 
-
   return res.status(200).json(whatsapp);
 };
 
@@ -356,33 +430,49 @@ export const update = async (
     companyId
   });
 
+  if (["whatsapp_oficial"].includes(whatsapp.channel)) {
+    try {
+      const whatsappOficial: IUpdateonnectionWhatsAppOficialWhatsApp = {
+        token_mult100: whatsapp.token,
+        phone_number_id: whatsapp.phone_number_id,
+        waba_id: whatsapp.waba_id,
+        send_token: whatsapp.send_token,
+        business_id: whatsapp.business_id,
+        phone_number: whatsapp.phone_number
+      };
+
+      await UpdateConnectionWhatsAppOficial(
+        whatsapp.waba_webhook_id,
+        whatsappOficial
+      );
+    } catch (error) {
+      logger.info("ERROR", error);
+    }
+  }
+
   const io = getIO();
-  io.of(String(companyId))
-    .emit(`company-${companyId}-whatsapp`, {
-      action: "update",
-      whatsapp
-    });
+  io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+    action: "update",
+    whatsapp
+  });
 
   if (oldDefaultWhatsapp) {
-    io.of(String(companyId))
-      .emit(`company-${companyId}-whatsapp`, {
-        action: "update",
-        whatsapp: oldDefaultWhatsapp
-      });
+    io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+      action: "update",
+      whatsapp: oldDefaultWhatsapp
+    });
   }
 
   return res.status(200).json(whatsapp);
-
 };
 
 export const closedTickets = async (req: Request, res: Response) => {
-  const { whatsappId } = req.params
+  const { whatsappId } = req.params;
 
-  closeTicketsImported(whatsappId)
+  closeTicketsImported(whatsappId);
 
   return res.status(200).json("whatsapp");
-
-}
+};
 
 export const remove = async (
   req: Request,
@@ -395,9 +485,8 @@ export const remove = async (
   if (profile !== "admin") {
     throw new AppError("ERR_NO_PERMISSION", 403);
   }
-  console.log("REMOVING WHATSAPP", whatsappId)
-  const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
 
+  const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
 
   if (whatsapp.channel === "whatsapp") {
     await DeleteBaileysService(whatsappId);
@@ -405,12 +494,29 @@ export const remove = async (
     await cacheLayer.delFromPattern(`sessions:${whatsappId}:*`);
     removeWbot(+whatsappId);
 
-    io.of(String(companyId))
-      .emit(`company-${companyId}-whatsapp`, {
-        action: "delete",
-        whatsappId: +whatsappId
-      });
+    io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+      action: "delete",
+      whatsappId: +whatsappId
+    });
+  }
 
+  if (whatsapp.channel === "whatsapp_oficial") {
+    await Whatsapp.destroy({
+      where: {
+        id: +whatsappId
+      }
+    });
+
+    try {
+      await DeleteConnectionWhatsAppOficial(whatsapp.waba_webhook_id);
+    } catch (error) {
+      logger.info("ERROR", error);
+    }
+
+    io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+      action: "delete",
+      whatsappId: +whatsappId
+    });
   }
 
   if (whatsapp.channel === "facebook" || whatsapp.channel === "instagram") {
@@ -429,13 +535,11 @@ export const remove = async (
     });
 
     for await (const whatsapp of getAllSameToken) {
-      io.of(String(companyId))
-        .emit(`company-${companyId}-whatsapp`, {
-          action: "delete",
-          whatsappId: whatsapp.id
-        });
+      io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+        action: "delete",
+        whatsappId: whatsapp.id
+      });
     }
-
   }
 
   return res.status(200).json({ message: "Session disconnected." });
@@ -459,7 +563,10 @@ export const restart = async (
   return res.status(200).json({ message: "Whatsapp restart." });
 };
 
-export const listAll = async (req: Request, res: Response): Promise<Response> => {
+export const listAll = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   const { companyId } = req.user;
   const { session } = req.query as QueryParams;
   const whatsapps = await ListAllWhatsAppsService({ session });
@@ -481,18 +588,16 @@ export const updateAdmin = async (
   });
 
   const io = getIO();
-  io.of(String(companyId))
-    .emit(`admin-whatsapp`, {
-      action: "update",
-      whatsapp
-    });
+  io.of(String(companyId)).emit(`admin-whatsapp`, {
+    action: "update",
+    whatsapp
+  });
 
   if (oldDefaultWhatsapp) {
-    io.of(String(companyId))
-      .emit(`admin-whatsapp`, {
-        action: "update",
-        whatsapp: oldDefaultWhatsapp
-      });
+    io.of(String(companyId)).emit(`admin-whatsapp`, {
+      action: "update",
+      whatsapp: oldDefaultWhatsapp
+    });
   }
 
   return res.status(200).json(whatsapp);
@@ -505,9 +610,8 @@ export const removeAdmin = async (
   const { whatsappId } = req.params;
   const { companyId } = req.user;
   const io = getIO();
-  console.log("REMOVING WHATSAPP ADMIN", whatsappId)
+  console.log("REMOVING WHATSAPP ADMIN", whatsappId);
   const whatsapp = await ShowWhatsAppService(whatsappId, companyId);
-
 
   if (whatsapp.channel === "whatsapp") {
     await DeleteBaileysService(whatsappId);
@@ -515,19 +619,16 @@ export const removeAdmin = async (
     await cacheLayer.delFromPattern(`sessions:${whatsappId}:*`);
     removeWbot(+whatsappId);
 
-    io.of(String(companyId))
-      .emit(`admin-whatsapp`, {
-        action: "delete",
-        whatsappId: +whatsappId
-      });
-
+    io.of(String(companyId)).emit(`admin-whatsapp`, {
+      action: "delete",
+      whatsappId: +whatsappId
+    });
   }
 
   if (whatsapp.channel === "facebook" || whatsapp.channel === "instagram") {
     const { facebookUserToken } = whatsapp;
 
     const getAllSameToken = await Whatsapp.findAll({
-
       where: {
         facebookUserToken
       }
@@ -540,25 +641,131 @@ export const removeAdmin = async (
     });
 
     for await (const whatsapp of getAllSameToken) {
-      io.of(String(companyId))
-        .emit(`company-${companyId}-whatsapp`, {
-          action: "delete",
-          whatsappId: whatsapp.id
-        });
+      io.of(String(companyId)).emit(`company-${companyId}-whatsapp`, {
+        action: "delete",
+        whatsappId: whatsapp.id
+      });
     }
-
   }
 
   return res.status(200).json({ message: "Session disconnected." });
 };
 
-export const showAdmin = async (req: Request, res: Response): Promise<Response> => {
+export const showAdmin = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
   const { whatsappId } = req.params;
   const { companyId } = req.user;
   // console.log("SHOWING WHATSAPP ADMIN", whatsappId)
   const whatsapp = await ShowWhatsAppServiceAdmin(whatsappId);
 
-
   return res.status(200).json(whatsapp);
 };
 
+export const syncTemplatesOficial = async (
+  req: Request,
+  res: Response
+): Promise<Response> => {
+  const { companyId, id: userId } = req.user;
+  const { whatsappId } = req.params;
+
+  const whatsapp = await Whatsapp.findByPk(whatsappId);
+
+  if (whatsapp.companyId !== companyId) {
+    throw new AppError("ERR_NO_PERMISSION", 403);
+  }
+
+  const data = await getTemplatesWhatsAppOficial(whatsapp.token);
+  // console.log("CHEGOU NO SYNC", data)
+  if (data.data.length > 0) {
+    await Promise.all(
+      data.data.map(async template => {
+        const quickMessage = await QuickMessage.findOne({
+          where: {
+            metaID: template.id
+          },
+          include: [
+            {
+              model: QuickMessageComponent,
+              as: "components"
+            }
+          ]
+        });
+
+        if (quickMessage) {
+          await quickMessage.update({
+            message: template.name,
+            category: template.category,
+            status: template.status,
+            language: template.language
+          });
+
+          if (template?.components?.length > 0) {
+            if (quickMessage?.components?.length > 0) {
+              try {
+                await QuickMessageComponent.destroy({
+                  where: {
+                    quickMessageId: quickMessage.id
+                  }
+                });
+              } catch (error) {
+                console.error(
+                  "Error destroying QuickMessageComponents:",
+                  error
+                );
+              }
+            } else {
+            }
+
+            await Promise.all(
+              template.components.map(async component => {
+                await QuickMessageComponent.create({
+                  quickMessageId: quickMessage.id,
+                  type: component.type,
+                  text: component.text,
+                  buttons: JSON.stringify(component?.buttons),
+                  format: component?.format,
+                  example: JSON.stringify(component?.example)
+                });
+              })
+            );
+          }
+        } else {
+          const templateData = {
+            shortcode: template.name,
+            message: template.name,
+            companyId: companyId,
+            userId: userId,
+            geral: true,
+            isMedia: false,
+            mediaPath: null,
+            visao: true,
+            isOficial: true,
+            language: template.language,
+            status: template.status,
+            category: template.category,
+            metaID: template.id,
+            whatsappId: whatsapp.id
+          };
+          const qm = await CreateService(templateData);
+
+          await Promise.all(
+            template.components.map(async component => {
+              await QuickMessageComponent.create({
+                quickMessageId: qm.id,
+                type: component.type,
+                text: component.text,
+                buttons: JSON.stringify(component?.buttons),
+                format: component?.format,
+                example: JSON.stringify(component?.example)
+              });
+            })
+          );
+        }
+      })
+    );
+  }
+
+  return res.status(200).json(data);
+};

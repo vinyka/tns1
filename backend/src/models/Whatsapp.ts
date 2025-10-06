@@ -61,7 +61,7 @@ class Whatsapp extends Model<Whatsapp> {
   greetingMessage: string;
 
   @Column
-  greetingMediaAttachment: string
+  greetingMediaAttachment: string;
 
   @Default("")
   @Column(DataType.TEXT)
@@ -176,7 +176,7 @@ class Whatsapp extends Model<Whatsapp> {
   @Default("disabled")
   @Column
   groupAsTicket: string;
-  
+
   @Column
   importOldMessages: Date;
 
@@ -185,12 +185,12 @@ class Whatsapp extends Model<Whatsapp> {
 
   @Column
   statusImportMessages: string;
-  
-  @Column
-  closedTicketsPostImported:boolean;
 
   @Column
-  importOldMessagesGroups:boolean;
+  closedTicketsPostImported: boolean;
+
+  @Column
+  importOldMessagesGroups: boolean;
 
   @Column
   timeCreateNewTicket: number;
@@ -201,6 +201,13 @@ class Whatsapp extends Model<Whatsapp> {
 
   @BelongsTo(() => QueueIntegrations)
   queueIntegrations: QueueIntegrations;
+
+  @ForeignKey(() => QueueIntegrations)
+  @Column
+  integrationTypeId: number;
+
+  @BelongsTo(() => QueueIntegrations)
+  integrationType: QueueIntegrations;
 
   @Column({
     type: DataType.JSONB
@@ -230,6 +237,38 @@ class Whatsapp extends Model<Whatsapp> {
   @BelongsTo(() => Queue)
   queueImport: Queue;
 
+  @Column
+  phone_number_id: string;
+
+  @Column
+  waba_id: string;
+
+  @Column
+  send_token: string;
+
+  @Column
+  business_id: string;
+
+  @Column
+  phone_number: string;
+
+  @Column
+  waba_webhook: string;
+
+  @Column
+  waba_webhook_id: number;
+
+  @Default("")
+  @Column
+  color: string;
+
+  @Column
+  flowInactiveTime: number;
+
+  @Default(1)
+  @Column
+  maxUseInactiveTime: number;
+
   @ForeignKey(() => FlowBuilderModel)
   @Column
   flowIdNotPhrase: number;
@@ -239,7 +278,24 @@ class Whatsapp extends Model<Whatsapp> {
   flowIdWelcome: number;
 
   @BelongsTo(() => FlowBuilderModel)
-  flowBuilder: FlowBuilderModel
+  flowBuilder: FlowBuilderModel;
+
+  @ForeignKey(() => FlowBuilderModel)
+  @Column
+  flowIdInactiveTime: number;
+
+  @Column
+  timeToReturnQueue: number;
+
+  @Column
+  triggerIntegrationOnClose: boolean;
+
+  @ForeignKey(() => FlowBuilderModel)
+  @Column
+  timeAwaitActiveFlowId: number;
+
+  @Column
+  timeAwaitActiveFlow: number;
 }
 
 export default Whatsapp;

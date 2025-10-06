@@ -22,7 +22,7 @@ import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
 import CreateMessageService from "../services/MessageServices/CreateMessageService";
 
 import { sendFacebookMessageMedia } from "../services/FacebookServices/sendFacebookMessageMedia";
-import sendFaceMessage from "../services/FacebookServices/sendFacebookMessage";
+import { sendFacebookMessage } from "../services/FacebookServices/sendFacebookMessage";
 
 import ShowPlanCompanyService from "../services/CompanyService/ShowPlanCompanyService";
 import ListMessagesServiceAll from "../services/MessageServices/ListMessagesServiceAll";
@@ -37,6 +37,9 @@ import ShowMessageService, { GetWhatsAppFromMessage } from "../services/MessageS
 import CompaniesSettings from "../models/CompaniesSettings";
 import { verifyMessageFace, verifyMessageMedia } from "../services/FacebookServices/facebookMessageListener";
 import EditWhatsAppMessage from "../services/MessageServices/EditWhatsAppMessage";
+import SendWhatsAppOficialMessage from "../services/WhatsAppOficial/SendWhatsAppOficialMessage";
+import ShowService from "../services/QuickMessageService/ShowService";
+import { IMetaMessageTemplateComponents, IMetaMessageTemplate } from "../libs/whatsAppOficial/IWhatsAppOficial.interfaces";
 import CheckContactNumber from "../services/WbotServices/CheckNumber";
 import TranscribeAudioMessageToText from "../services/MessageServices/TranscribeAudioMessageService";
 
@@ -55,7 +58,6 @@ interface TokenPayload {
   exp: number;
 }
 
-
 type MessageData = {
   body: string;
   fromMe: boolean;
@@ -64,6 +66,16 @@ type MessageData = {
   number?: string;
   isPrivate?: string;
   vCard?: Contact;
+};
+
+type MessageTemplateData = {
+  fromMe: boolean;
+  read: boolean;
+  quotedMsg?: Message;
+  number?: string;
+  templateId: string;
+  variables: string[];
+  bodyToSave: string;
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
@@ -92,14 +104,14 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
     user
   });
 
-  if (ticket.channel === "whatsapp" && ticket.whatsappId) {
+  if (["whatsapp", "whatsapp_oficial"].includes(ticket.channel) && ticket.whatsappId) {
     SetTicketMessagesAsRead(ticket);
   }
 
   return res.json({ count, messages, ticket, hasMore });
 };
 
-function obterNomeEExtensaoDoArquivo(url) {
+export function obterNomeEExtensaoDoArquivo(url) {
   var urlObj = new URL(url);
   var pathname = urlObj.pathname;
   var filename = pathname.split('/').pop();
@@ -111,25 +123,101 @@ function obterNomeEExtensaoDoArquivo(url) {
   return `${nomeDoArquivo}.${extensao}`;
 }
 
+// ✅ CORREÇÃO: Função melhorada para detectar arquivos de áudio
+
+const isAudioFile = (media: Express.Multer.File): boolean => {
+  console.log("🔍 Verificando se é áudio:", {
+    originalname: media.originalname,
+    mimetype: media.mimetype,
+    fieldname: media.fieldname
+  });
+
+  // 1. Verificar se foi enviado pelo campo de áudio (resposta rápida)
+  if (media.fieldname === 'audio') {
+    console.log("✅ Detectado como áudio pelo fieldname");
+    return true;
+  }
+
+  // 2. Verificar mimetype
+  if (media.mimetype && media.mimetype.startsWith('audio/')) {
+    console.log("✅ Detectado como áudio pelo mimetype:", media.mimetype);
+    return true;
+  }
+
+  // 3. Verificar extensão do arquivo
+  if (media.originalname) {
+    const audioExtensions = ['.mp3', '.ogg', '.wav', '.webm', '.m4a', '.aac', '.opus'];
+    const extension = path.extname(media.originalname).toLowerCase();
+    
+    if (audioExtensions.includes(extension)) {
+      console.log("✅ Detectado como áudio pela extensão:", extension);
+      return true;
+    }
+  }
+
+  // 4. Verificar padrões no nome do arquivo
+  if (media.originalname && 
+      (media.originalname.includes('audio_') || 
+       media.originalname.includes('áudio') ||
+       media.originalname.includes('voice'))) {
+    console.log("✅ Detectado como áudio pelo padrão do nome");
+    return true;
+  }
+
+  console.log("❌ Não detectado como áudio");
+  return false;
+};
+
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId } = req.params;
-
   const { body, quotedMsg, vCard, isPrivate = "false" }: MessageData = req.body;
   const medias = req.files as Express.Multer.File[];
   const { companyId } = req.user;
 
   const ticket = await ShowTicketService(ticketId, companyId);
 
-  if (ticket.channel === "whatsapp" && ticket.whatsappId) {
-    SetTicketMessagesAsRead(ticket);
+  if (!ticket.whatsappId) {
+    throw new AppError("Este ticket não possui conexão vinculada, provavelmente foi excluída a conexão.", 400);
   }
+
+  SetTicketMessagesAsRead(ticket);
 
   try {
     if (medias) {
       await Promise.all(
         medias.map(async (media: Express.Multer.File, index) => {
+          console.log(`🔍 Processando mídia ${index + 1}:`, {
+            originalname: media.originalname,
+            mimetype: media.mimetype,
+            fieldname: media.fieldname,
+            size: media.size
+          });
+          
+          // ✅ CORREÇÃO: Verificação melhorada para áudio
+          if (isAudioFile(media)) {
+            console.log("🎵 Processando como arquivo de áudio");
+          } else {
+            console.log("📎 Processando como arquivo comum");
+          }
+
           if (ticket.channel === "whatsapp") {
-            await SendWhatsAppMedia({ media, ticket, body: Array.isArray(body) ? body[index] : body, isPrivate: isPrivate === "true", isForwarded: false });
+            await SendWhatsAppMedia({ 
+              media, 
+              ticket, 
+              body: Array.isArray(body) ? body[index] : body, 
+              isPrivate: isPrivate === "true", 
+              isForwarded: false 
+            });
+          }
+
+          if (ticket.channel == 'whatsapp_oficial') {
+            await SendWhatsAppOficialMessage({
+              media, 
+              body: Array.isArray(body) ? body[index] : body, 
+              ticket, 
+              type: null, 
+              quotedMsg
+            })
           }
 
           if (["facebook", "instagram"].includes(ticket.channel)) {
@@ -148,19 +236,31 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
             }
           }
 
-          //limpar arquivo nao utilizado mais após envio
-          const filePath = path.resolve("public", `company${companyId}`, media.filename);
-          const fileExists = fs.existsSync(filePath);
+          // ✅ CORREÇÃO: Limpar arquivo após envio (exceto para privadas)
+          // if (isPrivate === "false") {
+          //   const filePath = path.resolve("public", `company${companyId}`, media.filename);
+          //   const fileExists = fs.existsSync(filePath);
 
-          if (fileExists && isPrivate === "false") {
-            fs.unlinkSync(filePath);
-          }
+          //   if (fileExists) {
+          //     try {
+          //       // fs.unlinkSync(filePath);
+          //       // console.log("🗑️ Arquivo temporário removido:", filePath);
+          //     } catch (unlinkError) {
+          //       console.warn("⚠️ Erro ao remover arquivo temporário:", unlinkError);
+          //     }
+          //   }
+          // }
         })
       );
     } else {
+      // Tratamento para mensagens sem mídia (código existente)
       if (ticket.channel === "whatsapp" && isPrivate === "false") {
         await SendWhatsAppMessage({ body, ticket, quotedMsg, vCard });
-      } else if (ticket.channel === "whatsapp" && isPrivate === "true") {
+      } else if (ticket.channel == 'whatsapp_oficial' && isPrivate === "false") {
+        await SendWhatsAppOficialMessage({
+          body, ticket, quotedMsg, type: !isNil(vCard) ? 'contacts' : 'text', media: null, vCard
+        })
+      } else if (isPrivate === "true") {
         const messageData = {
           wid: `PVT${ticket.updatedAt.toString().replace(' ', '')}`,
           ticketId: ticket.id,
@@ -180,8 +280,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
         await CreateMessageService({ messageData, companyId: ticket.companyId });
 
-      } else if (["facebook", "instagram"].includes(ticket.channel)) {
-        const sendText = await sendFaceMessage({ body, ticket, quotedMsg });
+      } else if (["facebook", "instagram"].includes(ticket.channel) && isPrivate === "false") {
+        const sendText = await sendFacebookMessage({ body, ticket, quotedMsg });
 
         if (ticket.channel === "facebook") {
           await verifyMessageFace(sendText, body, ticket, ticket.contact, true);
@@ -190,42 +290,8 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
     }
     return res.send();
   } catch (error) {
-    console.log(error);
+    console.error("❌ Erro no envio de mensagem:", error);
     return res.status(400).json({ error: error.message });
-  }
-};
-
-// Transcrição de Áudio (manual via HTTP)
-export const transcribeAudioMessage = async (
-  req: Request,
-  res: Response
-): Promise<Response> => {
-  const { fileName } = req.params as { fileName: string };
-  const { companyId } = req.user;
-
-  try {
-    const transcribedText = await TranscribeAudioMessageToText(fileName, companyId);
-    if (typeof transcribedText === "string") {
-      const msg = transcribedText;
-      // Mapear mensagens de regra de negócio para códigos HTTP adequados
-      if (msg === "Recurso de transcrição de áudio não habilitado no plano da empresa.") {
-        return res.status(403).send({ error: msg });
-      }
-      if (msg === "Arquivo não encontrado" || msg === "Empresa não encontrada") {
-        return res.status(404).send({ error: msg });
-      }
-      if (msg.startsWith("Token OpenAI não configurado")) {
-        return res.status(400).send({ error: msg });
-      }
-      // Falhas internas ao verificar configurações/plano permanecem 500
-      return res.status(500).send({ error: msg });
-    }
-    return res.send(transcribedText);
-  } catch (error) {
-    console.error(error);
-    return res
-      .status(500)
-      .send({ error: "Erro ao transcrever a mensagem de áudio." });
   }
 };
 
@@ -274,14 +340,13 @@ export const forwardMessage = async (
       ticket.queueId,
       requestUser.id,
       contact.isGroup ? contact : null,
-      "whatsapp",
+      ticket.channel,
       null,
       true,
       settings,
       false,
       false
     );
-
     return result;
   });
 
@@ -307,8 +372,18 @@ export const forwardMessage = async (
   });
 
   let body = message.body;
-  if (message.mediaType === 'conversation' || message.mediaType === 'extendedTextMessage') {
-    await SendWhatsAppMessage({ body, ticket: createTicket, quotedMsg, isForwarded: message.fromMe ? false : true });
+  if (message.mediaType === 'conversation'
+    || message.mediaType === 'extendedTextMessage'
+    || message.mediaType === 'text'
+    || message.mediaType === 'location'
+    || message.mediaType === 'contactMessage'
+    || message.mediaType === 'interactive') {
+    if (ticket.channel === "whatsapp") {
+      await SendWhatsAppMessage({ body, ticket: createTicket, quotedMsg, isForwarded: message.fromMe ? false : true });
+    }
+    if (ticket.channel === "whatsapp_oficial") {
+      await SendWhatsAppOficialMessage({ body: `_Mensagem encaminhada_:\n ${body}`, ticket: createTicket, quotedMsg, type: 'text', media: null });
+    }
   } else {
 
     const mediaUrl = message.mediaUrl.replace(`:${process.env.PORT}`, '');
@@ -331,7 +406,12 @@ export const forwardMessage = async (
       path: filePath
     } as Express.Multer.File
 
-    await SendWhatsAppMedia({ media: mediaSrc, ticket: createTicket, body, isForwarded: message.fromMe ? false : true });
+    if (ticket.channel === "whatsapp") {
+      await SendWhatsAppMedia({ media: mediaSrc, ticket: createTicket, body, isForwarded: message.fromMe ? false : true });
+    }
+    if (ticket.channel === "whatsapp_oficial") {
+      await SendWhatsAppOficialMessage({ body: `_Mensagem encaminhada_:\n ${body}`, ticket: createTicket, quotedMsg, type: null, media: mediaSrc });
+    }
   }
 
   return res.send();
@@ -489,6 +569,141 @@ export const edit = async (req: Request, res: Response): Promise<Response> => {
   return res.send();
 }
 
+export const storeTemplate = async (req: Request, res: Response): Promise<Response> => {
+  const { ticketId } = req.params;
+
+  const { quotedMsg, templateId, variables, bodyToSave }: MessageTemplateData = req.body;
+  const medias = req.files as Express.Multer.File[];
+  const { companyId } = req.user;
+
+  const ticket = await ShowTicketService(ticketId, companyId);
+
+  const template = await ShowService(templateId, companyId);
+
+  if (!template) {
+    throw new Error("Template not found");
+  }
+  let templateData: IMetaMessageTemplate = {
+    name: template.shortcode,
+    language: {
+      code: template.language
+    }
+  }
+  let buttonsToSave = []
+  if (Object.keys(variables).length > 0) {
+    templateData = {
+      name: template.shortcode,
+      language: {
+        code: template.language
+      },
+    };
+
+    if (Array.isArray(template.components) && template.components.length > 0) {
+      template.components.forEach((component, index) => {
+        const componentType = component.type.toLowerCase() as "header" | "body" | "footer" | "button";
+        // Verifique se há variáveis para o componente atual
+        if (variables[componentType] && Object.keys(variables[componentType]).length > 0) {
+          let newComponent
+
+          if (componentType.replace("buttons", "button") === "button") {
+            const buttons = JSON.parse(component.buttons)
+            buttons.forEach((button, index) => {
+              const subButton = Object.values(variables[componentType])
+              subButton.forEach((sub, indexSub) => {
+                // Verifica se o buttonIndex corresponde ao button.index
+                if ((sub as any).buttonIndex === index) {
+                  const buttonType = button.type;
+                  newComponent =
+                  {
+                    type: componentType.replace("buttons", "button"),
+                    sub_type: buttonType,
+                    index: index,
+                    parameters: []
+                  };
+                }
+              })
+            })
+          }
+          else {
+            newComponent = {
+              type: componentType,
+              parameters: []
+            };
+          }
+
+          if (newComponent) {
+            Object.keys(variables[componentType]).forEach(key => {
+              if (componentType.replace("buttons", "button") === "button") {
+                if ((newComponent as any)?.sub_type === "COPY_CODE") {
+                  newComponent.parameters.push({
+                    type: "coupon_code",
+                    coupon_code: variables[componentType][key].value
+                  })
+
+                } else {
+                  newComponent.parameters.push({
+                    type: "text",
+                    text: variables[componentType][key].value
+                  })
+                }
+
+              }
+              else {
+                if (template.components[index].format === 'IMAGE') {
+                  newComponent.parameters.push({
+                    type: "image",
+                    image: {
+                      link: variables[componentType][key].value
+                    }
+                  })
+                }
+                else {
+                  const variableValue = variables[componentType][key].value;
+                  newComponent.parameters.push({
+                    type: "text",
+                    text: variableValue
+                  });
+                }
+              }
+            });
+          }
+          if (!Array.isArray(templateData.components)) {
+            templateData.components = [];
+          }
+          templateData.components.push(newComponent as IMetaMessageTemplateComponents);
+        }
+      });
+    }
+  }
+
+  if (template.components.length > 0) {
+    for (const component of template.components) {
+      if (component.type === 'BUTTONS') {
+        buttonsToSave.push(component.buttons)
+      }
+    }
+  }
+  console.log(JSON.stringify(templateData, null, 2))
+  const newBodyToSave = bodyToSave.concat('||||', JSON.stringify(buttonsToSave))
+  if (["whatsapp_oficial"].includes(ticket.channel) && ticket.whatsappId) {
+    SetTicketMessagesAsRead(ticket);
+  }
+
+  try {
+
+    if (ticket.channel == 'whatsapp_oficial') {
+      await SendWhatsAppOficialMessage({
+        body: newBodyToSave, ticket, quotedMsg, type: 'template', media: null, template: templateData
+      })
+    }
+
+    return res.send(200);
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({ error: error.message });
+  }
+};
+
 export const sendMessageFlow = async (
   whatsappId: number,
   body: any,
@@ -514,8 +729,8 @@ export const sendMessageFlow = async (
 
     const companyId = messageData.companyId;
 
-    const CheckValidNumber = await CheckContactNumber(numberToTest, companyId);
-    const number = CheckValidNumber.replace(/\D/g, "");
+    const CheckValidNumber: any = await CheckContactNumber(numberToTest, companyId);
+    const number = CheckValidNumber.jid.split("@")[0];
 
     if (medias) {
       await Promise.all(
@@ -560,3 +775,12 @@ export const sendMessageFlow = async (
     }
   }
 };
+
+export const transcribeAudioMessage = async (req: Request, res: Response): Promise<Response> => {
+  const { companyId } = req.user;
+  const { wid } = req.body;
+
+  const transcribedText = await TranscribeAudioMessageToText(wid, companyId.toString());
+
+  return res.send(transcribedText);
+}

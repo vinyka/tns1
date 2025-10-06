@@ -22,8 +22,6 @@ const UpdateFlowBuilderService = async ({
       }
     })
 
-    console.log({ nameExist })
-    
     if(nameExist){
       return 'exist'
     }

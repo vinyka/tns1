@@ -2,12 +2,12 @@ import axios from "axios";
 import FormData from "form-data";
 import { createReadStream } from "fs";
 import logger from "../../utils/logger";
-
+import { isNil } from "lodash";
 const formData: FormData = new FormData();
 
 const apiBase = (token: string) =>
   axios.create({
-    baseURL: "https://graph.facebook.com/v18.0/",
+    baseURL: "https://graph.facebook.com/v20.0/",
     params: {
       access_token: token
     }
@@ -15,7 +15,7 @@ const apiBase = (token: string) =>
 
 export const getAccessToken = async (): Promise<string> => {
   const { data } = await axios.get(
-    "https://graph.facebook.com/v18.0/oauth/access_token",
+    "https://graph.facebook.com/v20.0/oauth/access_token",
     {
       params: {
         client_id: process.env.FACEBOOK_APP_ID,
@@ -53,29 +53,63 @@ export const showTypingIndicator = async (
 
     return data;
   } catch (error) {
-    console.log(error);
+    //console.log(error);
   }
 
 }
-
 
 export const sendText = async (
   id: string | number,
   text: string,
   token: string,
+  tag?: string | null
 ): Promise<void> => {
   try {
-    const { data } = await apiBase(token).post("me/messages", {
-      recipient: {
-        id
-      },
-      message: {
-        text: `${text}`,
-      }
-    });
-    return data;
+    console.log("tag SendText", tag)
+    if (!isNil(tag)) {
+      const { data } = await apiBase(token).post("me/messages", {
+        recipient: {
+          id
+        },
+        message: {
+          text: `${text}`,
+        },
+        messaging_type: "MESSAGE_TAG",
+        tag: tag
+      });
+      return data;
+    } else {
+      const { data } = await apiBase(token).post("me/messages", {
+        recipient: {
+          id
+        },
+        message: {
+          text: `${text}`,
+        },
+      });
+      return data;
+    }
   } catch (error) {
-    console.log(error);
+    logger.error(`ERR_SENDING_MESSAGE_TO_FACEBOOK_TRY_3: ${error}`);
+    try {
+      if (!isNil(tag)) {
+        const { data } = await apiBase(token).post("me/messages", {
+          recipient: {
+          id
+        },
+        message: {
+          text: `${text}`,
+        },
+        messaging_type: "MESSAGE_TAG",
+        tag: tag
+        });
+        return data;
+      } else {
+        throw new Error("ERR_SENDING_MESSAGE_TO_FACEBOOK_TRY_3");
+      }
+    } catch (error) {
+      console.log(error);
+    }
   }
 };
 
@@ -156,8 +190,9 @@ export const genText = (text: string): any => {
 
 export const getProfile = async (id: string, token: string): Promise<any> => {
   try {
-    const { data } = await apiBase(token).get(id);
-
+    const { data } = await axios.get(
+      `https://graph.facebook.com/v20.0/${id}?fields=name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user&access_token=${token}`
+    );
     return data;
   } catch (error) {
     console.log(error);
@@ -183,11 +218,10 @@ export const getPageProfile = async (
 export const profilePsid = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await axios.get(
-      `https://graph.facebook.com/v18.0/${id}?access_token=${token}`
+      `https://graph.facebook.com/v20.0/${id}?access_token=${token}`
     );
     return data;
   } catch (error) {
-    console.log(error);
     await getProfile(id, token);
   }
 };
@@ -195,7 +229,7 @@ export const profilePsid = async (id: string, token: string): Promise<any> => {
 export const subscribeApp = async (id: string, token: string): Promise<any> => {
   try {
     const { data } = await axios.post(
-      `https://graph.facebook.com/v18.0/${id}/subscribed_apps?access_token=${token}`,
+      `https://graph.facebook.com/v20.0/${id}/subscribed_apps?access_token=${token}`,
       {
         subscribed_fields: [
           "messages",
@@ -219,14 +253,13 @@ export const unsubscribeApp = async (
 ): Promise<any> => {
   try {
     const { data } = await axios.delete(
-      `https://graph.facebook.com/v18.0/${id}/subscribed_apps?access_token=${token}`
+      `https://graph.facebook.com/v20.0/${id}/subscribed_apps?access_token=${token}`
     );
     return data;
   } catch (error) {
     throw new Error("ERR_UNSUBSCRIBING_PAGE_TO_MESSAGE_WEBHOOKS");
   }
 };
-
 
 export const getSubscribedApps = async (
   id: string,
@@ -248,7 +281,7 @@ export const getAccessTokenFromPage = async (
     if (!token) throw new Error("ERR_FETCHING_FB_USER_TOKEN");
 
     const data = await axios.get(
-      "https://graph.facebook.com/v18.0/oauth/access_token",
+      "https://graph.facebook.com/v20.0/oauth/access_token",
       {
         params: {
           client_id: process.env.FACEBOOK_APP_ID,
@@ -271,7 +304,7 @@ export const removeApplcation = async (
   token: string
 ): Promise<void> => {
   try {
-    await axios.delete(`https://graph.facebook.com/v18.0/${id}/permissions`, {
+    await axios.delete(`https://graph.facebook.com/v20.0/${id}/permissions`, {
       params: {
         access_token: token
       }

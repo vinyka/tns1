@@ -30,7 +30,7 @@ import BlockIcon from "@material-ui/icons/Block";
 import api from "../../services/api";
 import TableRowSkeleton from "../../components/TableRowSkeleton";
 import ContactListItemModal from "../../components/ContactListItemModal";
-import ConfirmationModal from "../../components/ConfirmationModal";
+import ConfirmationModal from "../../components/ConfirmationModal/";
 
 import { i18n } from "../../translate/i18n";
 import MainHeader from "../../components/MainHeader";
@@ -276,7 +276,7 @@ const ContactListItems = () => {
         )}
       </ConfirmationModal>
       {
-        user.profile === "user" ?
+        user.profile === "user" && user?.showCampaign === "disabled" ?
           <ForbiddenPage />
           :
           <>

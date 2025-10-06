@@ -5,7 +5,6 @@ import { Formik, Form, Field } from "formik";
 import { toast } from "react-toastify";
 
 import {
-  Typography,
   Button,
   Dialog,
   DialogActions,
@@ -33,7 +32,7 @@ const useStyles = makeStyles((theme) => ({
   root: {
     display: "flex",
     flexWrap: "wrap",
-    gap: 4
+    gap: 4,
   },
   textField: {
     marginRight: theme.spacing(1),
@@ -76,8 +75,6 @@ const DialogflowSchema = Yup.object().shape({
   // language: Yup.string().min(2, "Too Short!").max(50, "Too Long!").required(),
 });
 
-
-
 const QueueIntegration = ({ open, onClose, integrationId }) => {
   const classes = useStyles();
 
@@ -95,7 +92,6 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
     typebotRestartMessage: "",
     typebotSlug: "",
     typebotUnknownMessage: "",
-
   };
 
   const [integration, setIntegration] = useState(initialState);
@@ -121,10 +117,9 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
         jsonContent: "",
         language: "",
         urlN8N: "",
-        typebotDelayMessage: 1000
+        typebotDelayMessage: 1000,
       });
     };
-
   }, [integrationId, open]);
 
   const handleClose = () => {
@@ -149,9 +144,14 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
   };
 
   const handleSaveDialogflow = async (values) => {
-
     try {
-      if (values.type === 'n8n' || values.type === 'webhook' || values.type === 'typebot' || values.type === "flowbuilder") values.projectName = values.name
+      if (
+        values.type === "n8n" ||
+        values.type === "webhook" ||
+        values.type === "typebot" ||
+        values.type === "flowbuilder"
+      )
+        values.projectName = values.name;
       if (integrationId) {
         await api.put(`/queueIntegration/${integrationId}`, values);
         toast.success(i18n.t("queueIntegrationModal.messages.editSuccess"));
@@ -163,13 +163,17 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
     } catch (err) {
       toastError(err);
     }
-
-
   };
 
   return (
     <div className={classes.root}>
-      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md" scroll="paper">
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+      >
         <DialogTitle>
           {integrationId
             ? `${i18n.t("queueIntegrationModal.title.edit")}`
@@ -222,7 +226,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                     </Grid>
                     {values.type === "dialogflow" && (
                       <>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
                             label={i18n.t("queueIntegrationModal.form.name")}
@@ -236,7 +240,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <FormControl
                             variant="outlined"
                             className={classes.formControl}
@@ -249,11 +253,15 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
 
                             <Field
                               as={Select}
-                              label={i18n.t("queueIntegrationModal.form.language")}
+                              label={i18n.t(
+                                "queueIntegrationModal.form.language"
+                              )}
                               name="language"
                               labelId="profile-selection-label"
                               fullWidth
-                              error={touched.language && Boolean(errors.language)}
+                              error={
+                                touched.language && Boolean(errors.language)
+                              }
                               helpertext={touched.language && errors.language}
                               id="language-selection"
                               required
@@ -264,22 +272,30 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             </Field>
                           </FormControl>
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.projectName")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.projectName"
+                            )}
                             name="projectName"
-                            error={touched.projectName && Boolean(errors.projectName)}
-                            helpertext={touched.projectName && errors.projectName}
+                            error={
+                              touched.projectName && Boolean(errors.projectName)
+                            }
+                            helpertext={
+                              touched.projectName && errors.projectName
+                            }
                             fullWidth
                             variant="outlined"
                             margin="dense"
                           />
                         </Grid>
-                        <Grid item xs={12} md={12} xl={12} >
+                        <Grid item xs={12} md={12} xl={12}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.jsonContent")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.jsonContent"
+                            )}
                             type="jsonContent"
                             multiline
                             //inputRef={greetingRef}
@@ -287,8 +303,12 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             minRows={5}
                             fullWidth
                             name="jsonContent"
-                            error={touched.jsonContent && Boolean(errors.jsonContent)}
-                            helpertext={touched.jsonContent && errors.jsonContent}
+                            error={
+                              touched.jsonContent && Boolean(errors.jsonContent)
+                            }
+                            helpertext={
+                              touched.jsonContent && errors.jsonContent
+                            }
                             variant="outlined"
                             margin="dense"
                           />
@@ -298,7 +318,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
 
                     {(values.type === "n8n" || values.type === "webhook") && (
                       <>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
                             label={i18n.t("queueIntegrationModal.form.name")}
@@ -313,7 +333,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={12} xl={12} >
+                        <Grid item xs={12} md={12} xl={12}>
                           <Field
                             as={TextField}
                             label={i18n.t("queueIntegrationModal.form.urlN8N")}
@@ -330,8 +350,8 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                       </>
                     )}
 
-                    {(values.type === "flowbuilder") && (
-                      <Grid item xs={12} md={6} xl={6} >
+                    {values.type === "flowbuilder" && (
+                      <Grid item xs={12} md={6} xl={6}>
                         <Field
                           as={TextField}
                           label={i18n.t("queueIntegrationModal.form.name")}
@@ -346,9 +366,10 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                         />
                       </Grid>
                     )}
-                    {(values.type === "typebot") && (
+
+                    {values.type === "typebot" && (
                       <>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
                             label={i18n.t("queueIntegrationModal.form.name")}
@@ -363,7 +384,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={12} xl={12} >
+                        <Grid item xs={12} md={12} xl={12}>
                           <Field
                             as={TextField}
                             label={i18n.t("queueIntegrationModal.form.urlN8N")}
@@ -377,13 +398,19 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotSlug")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotSlug"
+                            )}
                             name="typebotSlug"
-                            error={touched.typebotSlug && Boolean(errors.typebotSlug)}
-                            helpertext={touched.typebotSlug && errors.typebotSlug}
+                            error={
+                              touched.typebotSlug && Boolean(errors.typebotSlug)
+                            }
+                            helpertext={
+                              touched.typebotSlug && errors.typebotSlug
+                            }
                             required
                             variant="outlined"
                             margin="dense"
@@ -391,85 +418,131 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotExpires")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotExpires"
+                            )}
                             name="typebotExpires"
-                            error={touched.typebotExpires && Boolean(errors.typebotExpires)}
-                            helpertext={touched.typebotExpires && errors.typebotExpires}
+                            error={
+                              touched.typebotExpires &&
+                              Boolean(errors.typebotExpires)
+                            }
+                            helpertext={
+                              touched.typebotExpires && errors.typebotExpires
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotDelayMessage")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotDelayMessage"
+                            )}
                             name="typebotDelayMessage"
-                            error={touched.typebotDelayMessage && Boolean(errors.typebotDelayMessage)}
-                            helpertext={touched.typebotDelayMessage && errors.typebotDelayMessage}
+                            error={
+                              touched.typebotDelayMessage &&
+                              Boolean(errors.typebotDelayMessage)
+                            }
+                            helpertext={
+                              touched.typebotDelayMessage &&
+                              errors.typebotDelayMessage
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotKeywordFinish")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotKeywordFinish"
+                            )}
                             name="typebotKeywordFinish"
-                            error={touched.typebotKeywordFinish && Boolean(errors.typebotKeywordFinish)}
-                            helpertext={touched.typebotKeywordFinish && errors.typebotKeywordFinish}
+                            error={
+                              touched.typebotKeywordFinish &&
+                              Boolean(errors.typebotKeywordFinish)
+                            }
+                            helpertext={
+                              touched.typebotKeywordFinish &&
+                              errors.typebotKeywordFinish
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotKeywordRestart")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotKeywordRestart"
+                            )}
                             name="typebotKeywordRestart"
-                            error={touched.typebotKeywordRestart && Boolean(errors.typebotKeywordRestart)}
-                            helpertext={touched.typebotKeywordRestart && errors.typebotKeywordRestart}
+                            error={
+                              touched.typebotKeywordRestart &&
+                              Boolean(errors.typebotKeywordRestart)
+                            }
+                            helpertext={
+                              touched.typebotKeywordRestart &&
+                              errors.typebotKeywordRestart
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} xl={6} >
+                        <Grid item xs={12} md={6} xl={6}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotUnknownMessage")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotUnknownMessage"
+                            )}
                             name="typebotUnknownMessage"
-                            error={touched.typebotUnknownMessage && Boolean(errors.typebotUnknownMessage)}
-                            helpertext={touched.typebotUnknownMessage && errors.typebotUnknownMessage}
+                            error={
+                              touched.typebotUnknownMessage &&
+                              Boolean(errors.typebotUnknownMessage)
+                            }
+                            helpertext={
+                              touched.typebotUnknownMessage &&
+                              errors.typebotUnknownMessage
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-                        <Grid item xs={12} md={12} xl={12} >
+                        <Grid item xs={12} md={12} xl={12}>
                           <Field
                             as={TextField}
-                            label={i18n.t("queueIntegrationModal.form.typebotRestartMessage")}
+                            label={i18n.t(
+                              "queueIntegrationModal.form.typebotRestartMessage"
+                            )}
                             name="typebotRestartMessage"
-                            error={touched.typebotRestartMessage && Boolean(errors.typebotRestartMessage)}
-                            helpertext={touched.typebotRestartMessage && errors.typebotRestartMessage}
+                            error={
+                              touched.typebotRestartMessage &&
+                              Boolean(errors.typebotRestartMessage)
+                            }
+                            helpertext={
+                              touched.typebotRestartMessage &&
+                              errors.typebotRestartMessage
+                            }
                             variant="outlined"
                             margin="dense"
                             fullWidth
                             className={classes.textField}
                           />
                         </Grid>
-
                       </>
                     )}
                   </Grid>
@@ -520,7 +593,7 @@ const QueueIntegration = ({ open, onClose, integrationId }) => {
           )}
         </Formik>
       </Dialog>
-    </div >
+    </div>
   );
 };
 

@@ -48,7 +48,6 @@ import UserStatusIcon from "../UserModal/statusIcon";
 import usePlans from "../../hooks/usePlans";
 import ColorBoxModal from "../ColorBoxModal";
 // import { ColorBox } from "material-ui-color";
-import MessageVariablesPicker from "../MessageVariablesPicker";
 
 
 const useStyles = makeStyles((theme) => ({
@@ -131,7 +130,8 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
     ativarRoteador: false,
     integrationId: "",
     fileListId: "",
-    closeTicket: false
+    closeTicket: false,
+    typeRandomMode: "RANDOM"
   };
 
   const [colorPickerModalOpen, setColorPickerModalOpen] = useState(false);
@@ -245,7 +245,8 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
         ativarRoteador: false,
         integrationId: "",
         fileListId: "",
-        closeTicket: false
+        closeTicket: false,
+        typeRandomMode: "RANDOM"
       });
     };
   }, [queueId, open]);
@@ -365,6 +366,7 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
   };
 
   const handleSaveBot = async (values) => {
+    console.log(values)
     try {
       if (queueId) {
         const { data } = await api.put(`/queue/${queueId}`, values);
@@ -467,249 +469,244 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
               }, 400);
             }}
           >
-            {({ setFieldValue, touched, errors, isSubmitting, values }) => {
-              const handleClickGreetingVar = async msgVar => {
-                if (!greetingRef.current) return;
+            {({ setFieldValue, touched, errors, isSubmitting, values }) => (
+              <Form>
+                <DialogContent dividers>
+                  <Field
+                    as={TextField}
+                    label={i18n.t("queueModal.form.name")}
+                    autoFocus
+                    name="name"
+                    error={touched.name && Boolean(errors.name)}
+                    helperText={touched.name && errors.name}
+                    variant="outlined"
+                    margin="dense"
+                    className={classes.textField}
+                  />
+                  <Field
+                    as={TextField}
+                    label={i18n.t("queueModal.form.color")}
+                    name="color"
+                    id="color"
+                    onFocus={() => {
+                      setColorPickerModalOpen(true);
+                      greetingRef.current.focus();
+                    }}
+                    error={touched.color && Boolean(errors.color)}
+                    helperText={touched.color && errors.color}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <div
+                            style={{ backgroundColor: values.color }}
+                            className={classes.colorAdorment}
+                          ></div>
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <IconButton
+                          size="small"
+                          color="default"
+                          onClick={() => setColorPickerModalOpen(!colorPickerModalOpen)}
+                        >
+                          <Colorize />
 
-                const el = greetingRef.current;
-                const selectionStart = el.selectionStart ?? el.value.length;
-                const selectionEnd = el.selectionEnd ?? selectionStart;
-                const firstHalfText = el.value.substring(0, selectionStart);
-                const secondHalfText = el.value.substring(selectionEnd);
-                const newCursorPos = selectionStart + msgVar.length;
-
-                setFieldValue("greetingMessage", `${firstHalfText}${msgVar}${secondHalfText}`);
-
-                await new Promise(resolve => setTimeout(resolve, 0));
-                if (greetingRef.current) {
-                  greetingRef.current.focus();
-                  greetingRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                }
-              };
-
-              return (
-                <Form>
-                  <DialogContent dividers>
-                    <Field
-                      as={TextField}
-                      label={i18n.t("queueModal.form.name")}
-                      autoFocus
-                      name="name"
-                      error={touched.name && Boolean(errors.name)}
-                      helperText={touched.name && errors.name}
-                      variant="outlined"
-                      margin="dense"
-                      className={classes.textField}
-                    />
-                    <Field
-                      as={TextField}
-                      label={i18n.t("queueModal.form.color")}
-                      name="color"
-                      id="color"
-                      onFocus={() => {
-                        setColorPickerModalOpen(true);
-                        greetingRef.current.focus();
-                      }}
-                      error={touched.color && Boolean(errors.color)}
-                      helperText={touched.color && errors.color}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <div
-                              style={{ backgroundColor: values.color }}
-                              className={classes.colorAdorment}
-                            ></div>
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <IconButton
-                            size="small"
-                            color="default"
-                            onClick={() => setColorPickerModalOpen(!colorPickerModalOpen)}
-                          >
-                            <Colorize />
-
-                          </IconButton>
-                        ),
-                      }}
-                      variant="outlined"
-                      margin="dense"
-                    />
-                    <ColorBoxModal
-                      open={colorPickerModalOpen}
-                      handleClose={() => setColorPickerModalOpen(false)}
-                      onChange={(color) => {
-                        setFieldValue("color", `#${color.hex}`);
-                      }}
-                      currentColor={values.color}
-                    />
-
-                    <Field
-                      as={TextField}
-                      label={i18n.t("queueModal.form.orderQueue")}
-                      name="orderQueue"
-                      type="orderQueue"
-                      error={touched.orderQueue && Boolean(errors.orderQueue)}
-                      helperText={touched.orderQueue && errors.orderQueue}
-                      variant="outlined"
-                      margin="dense"
-                      className={classes.textField1}
-                    />
+                        </IconButton>
+                      ),
+                    }}
+                    variant="outlined"
+                    margin="dense"
+                  />
+                  <ColorBoxModal
+                    open={colorPickerModalOpen}
+                    handleClose={() => setColorPickerModalOpen(false)}
+                    onChange={(color) => {
+                      setFieldValue("color", `#${color.hex}`);
+                    }}
+                    currentColor={values.color}
+                  />
+                  
+                  <Field
+                    as={TextField}
+                    label={i18n.t("queueModal.form.orderQueue")}
+                    name="orderQueue"
+                    type="orderQueue"
+                    error={touched.orderQueue && Boolean(errors.orderQueue)}
+                    helperText={touched.orderQueue && errors.orderQueue}
+                    variant="outlined"
+                    margin="dense"
+                    className={classes.textField1}
+                  />
+                  <FormControlLabel
+                    control={
+                      <Field
+                        as={Switch}
+                        color="primary"
+                        name="closeTicket"
+                        checked={values.closeTicket}
+                      />
+                    }
+                    label={i18n.t("queueModal.form.closeTicket")}
+                  />
+                  <div>
                     <FormControlLabel
                       control={
                         <Field
                           as={Switch}
                           color="primary"
-                          name="closeTicket"
-                          checked={values.closeTicket}
+                          name="ativarRoteador"
+                          checked={values.ativarRoteador}
                         />
                       }
-                      label={i18n.t("queueModal.form.closeTicket")}
+                      label={i18n.t("queueModal.form.rotate")}
                     />
-                    <div>
-                      <FormControlLabel
-                        control={
-                          <Field
-                            as={Switch}
-                            color="primary"
-                            name="ativarRoteador"
-                            checked={values.ativarRoteador}
-                          />
-                        }
-                        label={i18n.t("queueModal.form.rotate")}
-                      />
-                      <Field
-                        as={Select}
-                        label={i18n.t("queueModal.form.timeRotate")}
-                        name="tempoRoteador"
-                        id="tempoRoteador"
-                        variant="outlined"
-                        margin="dense"
-                        className={classes.selectField}
-                      >
-                        <MenuItem value="0" selected disabled>{i18n.t("queueModal.form.timeRotate")}</MenuItem>
-                        <MenuItem value="2">2 minutos</MenuItem>
-                        <MenuItem value="5">5 minutos</MenuItem>
-                        <MenuItem value="10">10 minutos</MenuItem>
-                        <MenuItem value="15">15 minutos</MenuItem>
-                        <MenuItem value="30">30 minutos</MenuItem>
-                        <MenuItem value="45">45 minutos</MenuItem>
-                        <MenuItem value="60">60 minutos</MenuItem>
-                      </Field>
-                    </div>
-                    <div>
-                      {showIntegrations && (
-                        <FormControl
-                          variant="outlined"
-                          margin="dense"
-                          className={classes.FormControl}
-                          fullWidth
-                        >
-                          <InputLabel id="integrationId-selection-label">
-                            {i18n.t("queueModal.form.integrationId")}
-                          </InputLabel>
-                          <Field
-                            as={Select}
-                            label={i18n.t("queueModal.form.integrationId")}
-                            name="integrationId"
-                            id="integrationId"
-                            placeholder={i18n.t("queueModal.form.integrationId")}
-                            labelId="integrationId-selection-label"
-                            value={values.integrationId || ""}
-                          >
-                            <MenuItem value={""} >{"Nenhum"}</MenuItem>
-                            {integrations.map((integration) => (
-                              <MenuItem key={integration.id} value={integration.id}>
-                                {integration.name}
-                              </MenuItem>
-                            ))}
-                          </Field>
-
-                        </FormControl>
-                      )}
+                    <Field
+                      as={Select}
+                      label={i18n.t("queueModal.form.timeRotate")}
+                      name="tempoRoteador"
+                      id="tempoRoteador"
+                      variant="outlined"
+                      margin="dense"
+                      className={classes.selectField}
+                      disabled={!values.ativarRoteador}
+                    >
+                      <MenuItem value="0" selected disabled>{i18n.t("queueModal.form.timeRotate")}</MenuItem>
+                      <MenuItem value="1">1 minuto</MenuItem>
+                      <MenuItem value="2">2 minutos</MenuItem>
+                      <MenuItem value="3">3 minutos</MenuItem>
+                      <MenuItem value="4">4 minutos</MenuItem>
+                      <MenuItem value="5">5 minutos</MenuItem>
+                      <MenuItem value="10">10 minutos</MenuItem>
+                      <MenuItem value="15">15 minutos</MenuItem>
+                      <MenuItem value="30">30 minutos</MenuItem>
+                      <MenuItem value="45">45 minutos</MenuItem>
+                      <MenuItem value="60">60 minutos</MenuItem>
+                    </Field>
+                    &nbsp;
+                    <Field
+                      as={Select}
+                      label={i18n.t("queueModal.form.typeRandomMode")}
+                      name="typeRandomMode"
+                      id="typeRandomMode"
+                      variant="outlined"
+                      margin="dense"
+                      className={classes.selectField}
+                      disabled={!values.ativarRoteador}
+                    >
+                      <MenuItem value="0" selected disabled>{i18n.t("Selecione o tipo de rodízio")}</MenuItem>
+                      <MenuItem value="RANDOM">Random</MenuItem>
+                      <MenuItem value="ORDENADO">Ordenado</MenuItem>
+                    </Field>
+                  </div>
+                  <div>
+                    {showIntegrations && (
                       <FormControl
                         variant="outlined"
                         margin="dense"
                         className={classes.FormControl}
                         fullWidth
                       >
-                        <InputLabel id="fileListId-selection-label">{i18n.t("queueModal.form.fileListId")}</InputLabel>
+                        <InputLabel id="integrationId-selection-label">
+                          {i18n.t("queueModal.form.integrationId")}
+                        </InputLabel>
                         <Field
                           as={Select}
-                          label={i18n.t("queueModal.form.fileListId")}
-                          name="fileListId"
-                          id="fileListId"
-                          placeholder={i18n.t("queueModal.form.fileListId")}
-                          labelId="fileListId-selection-label"
-                          value={values.fileListId || ""}
+                          label={i18n.t("queueModal.form.integrationId")}
+                          name="integrationId"
+                          id="integrationId"
+                          placeholder={i18n.t("queueModal.form.integrationId")}
+                          labelId="integrationId-selection-label"
+                          value={values.integrationId || ""}
                         >
                           <MenuItem value={""} >{"Nenhum"}</MenuItem>
-                          {file.map(f => (
-                            <MenuItem key={f.id} value={f.id}>
-                              {f.name}
+                          {integrations.map((integration) => (
+                            <MenuItem key={integration.id} value={integration.id}>
+                              {integration.name}
                             </MenuItem>
                           ))}
                         </Field>
+
                       </FormControl>
-                    </div>
-                    <div>
+                    )}
+                    <FormControl
+                      variant="outlined"
+                      margin="dense"
+                      className={classes.FormControl}
+                      fullWidth
+                    >
+                      <InputLabel id="fileListId-selection-label">{i18n.t("queueModal.form.fileListId")}</InputLabel>
+                      <Field
+                        as={Select}
+                        label={i18n.t("queueModal.form.fileListId")}
+                        name="fileListId"
+                        id="fileListId"
+                        placeholder={i18n.t("queueModal.form.fileListId")}
+                        labelId="fileListId-selection-label"
+                        value={values.fileListId || ""}
+                      >
+                        <MenuItem value={""} >{"Nenhum"}</MenuItem>
+                        {file.map(f => (
+                          <MenuItem key={f.id} value={f.id}>
+                            {f.name}
+                          </MenuItem>
+                        ))}
+                      </Field>
+                    </FormControl>
+                  </div>
+                  <div>
+                    <Field
+                      as={TextField}
+                      label={i18n.t("queueModal.form.greetingMessage")}
+                      type="greetingMessage"
+                      multiline
+                      inputRef={greetingRef}
+                      minRows={5}
+                      fullWidth
+                      name="greetingMessage"
+                      error={
+                        touched.greetingMessage && Boolean(errors.greetingMessage)
+                      }
+                      helperText={
+                        touched.greetingMessage && errors.greetingMessage
+                      }
+                      variant="outlined"
+                      margin="dense"
+                    />
+                    {schedulesEnabled && (
                       <Field
                         as={TextField}
-                        label={i18n.t("queueModal.form.greetingMessage")}
-                        type="greetingMessage"
+                        label={i18n.t("queueModal.form.outOfHoursMessage")}
+                        type="outOfHoursMessage"
                         multiline
-                        inputRef={greetingRef}
-                        minRows={5}
+                        rows={5}
                         fullWidth
-                        name="greetingMessage"
+                        required={schedulesEnabled}
+                        name="outOfHoursMessage"
                         error={
-                          touched.greetingMessage && Boolean(errors.greetingMessage)
+                          touched.outOfHoursMessage &&
+                          Boolean(errors.outOfHoursMessage)
                         }
                         helperText={
-                          touched.greetingMessage && errors.greetingMessage
+                          touched.outOfHoursMessage && errors.outOfHoursMessage
                         }
                         variant="outlined"
                         margin="dense"
                       />
-                      <MessageVariablesPicker
-                        disabled={isSubmitting}
-                        onClick={value => handleClickGreetingVar(value)}
-                      />
-                      {schedulesEnabled && (
-                        <Field
-                          as={TextField}
-                          label={i18n.t("queueModal.form.outOfHoursMessage")}
-                          type="outOfHoursMessage"
-                          multiline
-                          rows={5}
-                          fullWidth
-                          required={schedulesEnabled}
-                          name="outOfHoursMessage"
-                          error={
-                            touched.outOfHoursMessage &&
-                            Boolean(errors.outOfHoursMessage)
-                          }
-                          helperText={
-                            touched.outOfHoursMessage && errors.outOfHoursMessage
-                          }
-                          variant="outlined"
-                          margin="dense"
-                        />
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    <Typography variant="subtitle1">
-                      {i18n.t("queueModal.bot.title")}
-                      <CustomToolTip
-                        title={i18n.t("queueModal.bot.toolTipTitle")}
-                        content={i18n.t("queueModal.bot.toolTip")}
-                      >
-                        <HelpOutlineOutlinedIcon
-                          style={{ marginLeft: "14px" }}
-                          fontSize="small"
-                        />
-                      </CustomToolTip>
-                    </Typography>
+                  <Typography variant="subtitle1">
+                    {i18n.t("queueModal.bot.title")}
+                    <CustomToolTip
+                      title={i18n.t("queueModal.bot.toolTipTitle")}
+                      content={i18n.t("queueModal.bot.toolTip")}
+                    >
+                      <HelpOutlineOutlinedIcon
+                        style={{ marginLeft: "14px" }}
+                        fontSize="small"
+                      />
+                    </CustomToolTip>
+                  </Typography>
 
                   <div>
                     <FieldArray name="chatbots">
@@ -1196,8 +1193,8 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
                       )}
                     </FieldArray>
                   </div>
-                  </DialogContent>
-                  <DialogActions>
+                </DialogContent>
+                <DialogActions>
                   <Button
                     onClick={handleClose}
                     // color="secondary"
@@ -1223,10 +1220,9 @@ const QueueModal = ({ open, onClose, queueId, onEdit }) => {
                       />
                     )}
                   </Button>
-                  </DialogActions>
-                </Form>
-              );
-            }}
+                </DialogActions>
+              </Form>
+            )}
           </Formik>
         )}
         {tab === 1 && (

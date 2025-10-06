@@ -10,6 +10,8 @@ interface Data {
   geral: boolean;
   isMedia: boolean;
   mediaPath?: string | null;
+  mediaName?: string | null;
+  mediaType?: string | null;
   visao: boolean;
 }
 

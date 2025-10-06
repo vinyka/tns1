@@ -65,6 +65,14 @@ const useTickets = ({
           }
         } else {
           try {
+            // console.log("ENTROU AQUI DASH")
+            // console.log(status,
+            //   showAll,
+            //   queueIds,
+            //   format(sub(new Date(), { days: 30 }), 'yyyy-MM-dd'),
+            //   format(new Date(), 'yyyy-MM-dd'),
+            //   userFilter)
+
             const {data} = await api.get("/dashboard/moments", {
               params: {
                 status,
@@ -75,6 +83,8 @@ const useTickets = ({
                 userId: userFilter
               }
             })
+
+            // console.log(data)
             let tickets = [];
             tickets = data.filter(item => item.userId == userFilter);            
 

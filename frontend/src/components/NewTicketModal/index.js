@@ -73,16 +73,16 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
           .get(`/whatsapp`, { params: { companyId, session: 0 } })
           .then(({ data }) => setWhatsapps(data));
 
-          // .then(({ data }) => {
-          //   const mappedWhatsapps = data.map((whatsapp) => ({
-          //     ...whatsapp,
-          //     selected: false,
-          //   }));
-          //   setWhatsapps(mappedWhatsapps);
-          //   if (channelFilter && mappedWhatsapps.length && mappedWhatsapps?.length === 1 && (user.whatsappId === null || user?.whatsapp?.channel !== channelFilter)) {
-          //     setSelectedWhatsapp(mappedWhatsapps[0].id)
-          //   }
-          // });
+        // .then(({ data }) => {
+        //   const mappedWhatsapps = data.map((whatsapp) => ({
+        //     ...whatsapp,
+        //     selected: false,
+        //   }));
+        //   setWhatsapps(mappedWhatsapps);
+        //   if (channelFilter && mappedWhatsapps.length && mappedWhatsapps?.length === 1 && (user.whatsappId === null || user?.whatsapp?.channel !== channelFilter)) {
+        //     setSelectedWhatsapp(mappedWhatsapps[0].id)
+        //   }
+        // });
       };
 
       if (whatsappId !== null && whatsappId !== undefined) {
@@ -129,6 +129,8 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
       case "instagram":
         return <Instagram style={{ color: "#e1306c", verticalAlign: "middle" }} />;
       case "whatsapp":
+        return <WhatsApp style={{ color: "#25d366", verticalAlign: "middle" }} />
+      case "whatsapp_oficial":
         return <WhatsApp style={{ color: "#25d366", verticalAlign: "middle" }} />
       default:
         return "error";
@@ -255,7 +257,7 @@ const NewTicketModal = ({ modalOpen, onClose, initialContact }) => {
             getOptionLabel={renderOptionLabel}
             renderOption={renderOption}
             filterOptions={createAddContactOption}
-            onChange={(e, newValue) => {                     
+            onChange={(e, newValue) => {
               setChannelFilter(newValue ? newValue.channel : "whatsapp");
               handleSelectOption(e, newValue)
             }}

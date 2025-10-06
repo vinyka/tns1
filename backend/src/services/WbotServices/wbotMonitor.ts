@@ -163,13 +163,19 @@ const wbotMonitor = async (
       }
 
       try {
-        await createOrUpdateBaileysService({
-          whatsappId: whatsapp.id,
-          contacts: filteredContacts,
-        });
+        // Verificar se filteredContacts é válido antes de enviar
+        if (Array.isArray(filteredContacts)) {
+          await createOrUpdateBaileysService({
+            whatsappId: whatsapp.id,
+            contacts: filteredContacts,
+          });
+        } else {
+          logger.info(`[RDS-BAILEYS] Pulando atualização de contatos - formato inválido para whatsapp ${whatsapp.id}`);
+        }
       } catch (err) {
-        console.log(filteredContacts);
-        logger.error(err)
+        logger.error(`[RDS-BAILEYS] Erro ao atualizar contatos para whatsapp ${whatsapp.id}:`, err);
+        // Log apenas de um resumo, não dos contatos completos para evitar logs muito grandes
+        logger.info(`[RDS-BAILEYS] Número de contatos tentados: ${filteredContacts?.length || 'undefined'}`);
       }
     });
 

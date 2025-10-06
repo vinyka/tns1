@@ -124,6 +124,39 @@ class Campaign extends Model<Campaign> {
 
   @Column({ defaultValue: "disabled" })
   openTicket: string;
+
+  @Column({ defaultValue: false })
+  isRecurring: boolean;
+
+  @Column
+  recurrenceType: string; // 'daily', 'weekly', 'biweekly', 'monthly', 'yearly'
+
+  @Column
+  recurrenceInterval: number; // Intervalo personalizado (ex: a cada 2 semanas)
+
+  @Column
+  recurrenceDaysOfWeek: string; // JSON array para dias da semana [0,1,2,3,4,5,6]
+
+  @Column
+  recurrenceDayOfMonth: number; // Dia específico do mês (1-31)
+
+  @Column
+  recurrenceEndDate: Date; // Data limite para recorrência
+
+  @Column
+  maxExecutions: number; // Número máximo de execuções
+
+  @Column({ defaultValue: 0 })
+  executionCount: number; // Contador de execuções
+
+  @Column
+  nextScheduledAt: Date; // Próxima execução programada
+
+  @Column
+  lastExecutedAt: Date; // Última execução realizada
+
+  @Column
+  tagListId: string; // ID da tag para seleção de contatos
 }
 
 export default Campaign;

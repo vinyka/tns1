@@ -26,6 +26,7 @@ import Chatbot from "./Chatbot";
 import QueueIntegrations from "./QueueIntegrations";
 import Files from "./Files";
 import Prompt from "./Prompt";
+import ContactWallet from "./ContactWallet";
 
 @Table
 class Queue extends Model<Queue> {
@@ -58,7 +59,11 @@ class Queue extends Model<Queue> {
   @AllowNull(false)
   @Column
   tempoRoteador: number;
-  
+
+  @Default("RANDOM")
+  @Column
+  typeRandomMode: string;
+
   @Default("")
   @Column
   outOfHoursMessage: string;
@@ -118,6 +123,9 @@ class Queue extends Model<Queue> {
     hooks: true
   })
   prompt: Prompt[];
+
+  @HasMany(() => ContactWallet)
+  contactWallets: ContactWallet[];
 
   @HasMany(() => Chatbot, {
     foreignKey: 'optQueueId', // Chave estrangeira que referencia o ID da fila

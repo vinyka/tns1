@@ -1,95 +1,83 @@
-import fs from "fs";
 import path from "path";
-import FormData from "form-data";
+import fs from "fs";
+import Message from "../../models/Message";
+
 import axios from "axios";
-import Setting from "../../models/Setting";
-import Company from "../../models/Company";
-import Plan from "../../models/Plan";
+import FormData from "form-data";
+import { Transcription } from "openai/resources/audio/transcriptions";
 
-// Response type for service return
-export type TranscriptionResponse = { transcribedText: string } | string;
+type Response = Transcription | string;
 
-async function fetchOpenAIToken(companyId: number): Promise<string | null> {
+const TranscribeAudioMessageToText = async (wid: string, companyId: string): Promise<Response> => {
   try {
-    // tenta pela empresa atual
-    let setting = await Setting.findOne({
-      where: { companyId, key: "openaikeyaudio" }
+    // Busca a mensagem com os detalhes do arquivo de áudio
+    const msg = await Message.findOne({
+      where: {
+        wid: wid,
+        companyId: companyId,
+      },
     });
-    // fallback para empresa master (1)
-    if (!setting && companyId !== 1) {
-      setting = await Setting.findOne({
-        where: { companyId: 1, key: "openaikeyaudio" }
-      });
+
+    if (!msg) {
+      throw new Error("Mensagem não encontrada");
     }
-    return setting?.value || null;
-  } catch (error) {
-    console.error("Error retrieving settings:", error);
-    return null;
-  }
-}
 
-const TranscribeAudioMessageToText = async (
-  fileName: string,
-  companyId: number
-): Promise<TranscriptionResponse> => {
-  // verifica se o plano da empresa permite o recurso
-  try {
-    const company = await Company.findByPk(companyId);
-    if (!company) {
-      return "Empresa não encontrada";
-    }
-    const plan = await Plan.findByPk(company.planId);
-    if (!plan || plan.useAudioTranscription === false) {
-      return "Recurso de transcrição de áudio não habilitado no plano da empresa.";
-    }
-  } catch (e) {
-    console.error("Erro ao verificar plano/useAudioTranscription", e);
-    return "Falha ao verificar permissões do plano para transcrição de áudio";
-  }
+    const data = new FormData();
+    let config;
 
-  const token = await fetchOpenAIToken(companyId);
-  if (!token) return "Token OpenAI não configurado (setting 'openaikeyaudio').";
-
-  const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
-  const filePath = `${publicFolder}/company${companyId}/${fileName}`;
-
-  if (!fs.existsSync(filePath)) {
-    console.error(`Arquivo não encontrado: ${filePath}`);
-    return "Arquivo não encontrado";
-  }
-
-  try {
-    const audioFile = fs.createReadStream(filePath);
-    const form = new FormData();
-    form.append("file", audioFile);
-    form.append("model", "whisper-1");
-    form.append("response_format", "text");
-    form.append("language", "pt");
-
-    const response = await axios.post(
-      "https://api.openai.com/v1/audio/transcriptions",
-      form,
-      {
+    // Verifica se a mediaUrl é uma URL válida
+    if (msg.mediaUrl.startsWith('http')) {
+      // Se for uma URL, usa diretamente
+      data.append('url', msg.mediaUrl);
+      config = {
+        method: 'post',
+        maxBodyLength: Infinity,
+        url: `${process.env.TRANSCRIBE_URL}/transcrever`,
         headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${token}`
-        }
-      }
-    );
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.TRANSCRIBE_API_KEY}`,
+          ...data.getHeaders(),
+        },
+        data: data,
+      };
+    } else {
+      // Se não for URL, mantém o comportamento atual
+      const urlParts = new URL(msg.mediaUrl);
+      const pathParts = urlParts.pathname.split('/');
+      const fileName = pathParts[pathParts.length - 1];
 
-    return { transcribedText: response.data };
-  } catch (error) {
-    // Melhorar logging e retorno de erro para diagnóstico
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      const data = error.response?.data;
-      console.error("OpenAI transcription error:", status, data || error.message);
-      if (data?.error?.message) {
-        return `Falha na API OpenAI: ${data.error.message}`;
+      const publicFolder = path.resolve(__dirname, "..", "..", "..", "public");
+      const filePath = path.join(publicFolder, `company${companyId}`, fileName);
+
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Arquivo não encontrado: ${filePath}`);
       }
-      return `Falha na API OpenAI${status ? ` (status ${status})` : ""}`;
+
+      data.append('audio', fs.createReadStream(filePath));
+      config = {
+        method: 'post',
+        maxBodyLength: Infinity,
+        url: `${process.env.TRANSCRIBE_URL}/transcrever`,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.TRANSCRIBE_API_KEY}`,
+          ...data.getHeaders(),
+        },
+        data: data,
+      };
     }
-    console.error(error);
+
+    // Faz a requisição para o endpoint
+    const res = await axios.request(config);
+
+    await msg.update({
+      body: res.data,
+      transcrito: true,
+    });
+
+    return res.data;
+  } catch (error) {
+    console.error("Erro durante a transcrição:", error);
     return "Conversão pra texto falhou";
   }
 };

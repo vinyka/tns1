@@ -19,6 +19,7 @@ interface QueueData {
   integrationId?: number | null;
   fileListId?: number | null;
   closeTicket?: boolean;
+  typeRandomMode?: string;
 }
 
 const UpdateQueueService = async (

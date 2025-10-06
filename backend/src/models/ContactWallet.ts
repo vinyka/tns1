@@ -12,6 +12,7 @@ import {
 import Contact from "./Contact";
 import Company from "./Company";
 import User from "./User";
+import Queue from "./Queue";
 
 @Table
 class ContactWallet extends Model<ContactWallet> {
@@ -33,6 +34,13 @@ class ContactWallet extends Model<ContactWallet> {
 
   @BelongsTo(() => User)
   wallet: User;
+
+  @ForeignKey(() => Queue)
+  @Column
+  queueId: number;
+
+  @BelongsTo(() => Queue)
+  queue: Queue;
 
   @ForeignKey(() => Company)
   @Column

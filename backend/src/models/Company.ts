@@ -9,7 +9,8 @@ import {
   ForeignKey,
   BelongsTo,
   DataType,
-  HasMany
+  HasMany,
+  Default
 } from "sequelize-typescript";
 import Contact from "./Contact";
 import Message from "./Message";
@@ -79,6 +80,10 @@ class Company extends Model<Company> {
 
   @Column
   folderSize: string;
+
+  @Default(true)
+  @Column
+  generateInvoice: boolean;
 
   @Column
   numberFileFolder: string;
@@ -162,6 +167,7 @@ class Company extends Model<Company> {
     hooks: true
   })
   invoices: Invoices[];
+
 }
 
 export default Company;

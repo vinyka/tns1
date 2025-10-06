@@ -21,6 +21,11 @@ import ShowQueueService from "../../QueueService/ShowQueueService";
 import ffmpeg from "fluent-ffmpeg";
 import { fi } from "date-fns/locale";
 import queue from "../../../libs/queue";
+import { getWbot } from "../../../libs/wbot";
+import flowBuilderQueue from "../../WebhookService/flowBuilderQueue";
+import { proto } from "@whiskeysockets/baileys";
+import ShowWhatsAppService from "../../WhatsappService/ShowWhatsAppService";
+
 const os = require("os");
 
 let ffmpegPath;
@@ -36,7 +41,6 @@ if (os.platform() === "win32") {
 }
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-
 interface IAddContact {
     companyId: number;
     name: string;
@@ -51,7 +55,6 @@ interface NumberPhrase {
     email: string
 }
 
-
 export const ActionsWebhookFacebookService = async (
     token: Whatsapp,
     idFlowDb: number,
@@ -64,14 +67,14 @@ export const ActionsWebhookFacebookService = async (
     hashWebhookId: string,
     pressKey?: string,
     idTicket?: number,
-    numberPhrase?: NumberPhrase
+    numberPhrase?: NumberPhrase,
+    msg?: proto.IWebMessageInfo
 ): Promise<string> => {
 
     const io = getIO()
     let next = nextStage;
     let createFieldJsonName = "";
     const connectStatic = connects;
-
 
     const lengthLoop = nodes.length;
     const getSession = await Whatsapp.findOne({
@@ -111,12 +114,15 @@ export const ActionsWebhookFacebookService = async (
     for (var i = 0; i < lengthLoop; i++) {
         let nodeSelected: any;
         let ticketInit: Ticket;
+
         if (idTicket) {
             ticketInit = await Ticket.findOne({
                 where: { id: idTicket }
             });
             if (ticketInit.status === "closed") {
-               break
+                if (numberPhrase === null || numberPhrase === undefined) {
+                    break;
+                }
             } else {
                 await ticketInit.update({
                     dataWebhook: {
@@ -125,6 +131,7 @@ export const ActionsWebhookFacebookService = async (
                 })
             }
         }
+
         if (pressKey) {
             if (pressKey === "parar") {
                 if (idTicket) {
@@ -161,8 +168,7 @@ export const ActionsWebhookFacebookService = async (
             console.log("====================================")
 
             selectedQueueid = queue.id;
-            console.log({ selectedQueueid })
-            //await updateQueueId(ticket, companyId, queue.id)
+            await updateQueueId(ticket, companyId, queue.id)
 
         }
 
@@ -170,7 +176,6 @@ export const ActionsWebhookFacebookService = async (
 
             for (var iLoc = 0; iLoc < nodeSelected.data.seq.length; iLoc++) {
                 const elementNowSelected = nodeSelected.data.seq[iLoc];
-                console.log(elementNowSelected, "elementNowSelected")
 
                 if (elementNowSelected.includes("message")) {
                     // await SendMessageFlow(whatsapp, {
@@ -184,7 +189,6 @@ export const ActionsWebhookFacebookService = async (
                     )[0].value;
 
                     const ticketDetails = await ShowTicketService(ticket.id, companyId);
-
 
                     const contact = await Contact.findOne({
                         where: { number: numberPhrase.number, companyId }
@@ -224,7 +228,6 @@ export const ActionsWebhookFacebookService = async (
 
                 }
 
-
                 if (elementNowSelected.includes("interval")) {
                     await intervalWhats(
                         nodeSelected.data.elements.filter(
@@ -232,7 +235,6 @@ export const ActionsWebhookFacebookService = async (
                         )[0].value
                     );
                 }
-
 
                 if (elementNowSelected.includes("img")) {
                     const mediaPath = process.env.BACKEND_URL === "http://localhost:8090"
@@ -260,7 +262,6 @@ export const ActionsWebhookFacebookService = async (
                     const mimeType = mime.lookup(mediaPath);
 
                     const domain = `${process.env.BACKEND_URL}/public/${fileNameWithoutExtension}${fileExtension}`
-
 
                     await showTypingIndicator(
                         contact.number,
@@ -290,7 +291,6 @@ export const ActionsWebhookFacebookService = async (
                     );
 
                 }
-
 
                 if (elementNowSelected.includes("audio")) {
                     const mediaDirectory =
@@ -356,7 +356,6 @@ export const ActionsWebhookFacebookService = async (
                     );
 
                 }
-
 
                 if (elementNowSelected.includes("video")) {
                     const mediaDirectory =
@@ -506,9 +505,11 @@ export const ActionsWebhookFacebookService = async (
 
             await intervalWhats("1");
         }
+
         if (nodeSelected.type === "interval") {
             await intervalWhats(nodeSelected.data.sec);
         }
+
         if (nodeSelected.type === "video") {
             const mediaDirectory =
                 process.env.BACKEND_URL === "http://localhost:8090"
@@ -559,6 +560,37 @@ export const ActionsWebhookFacebookService = async (
                 "typing_off"
             );
         }
+
+        let isSwitchFlow: boolean;
+        if (nodeSelected.type === "switchFlow") {
+            const data = nodeSelected.data?.flowSelected;
+
+            if (ticket) {
+                ticket = await Ticket.findOne({
+                    where: {
+                        id: ticket.id
+                    },
+                    include: [
+                        { model: Contact, as: "contact", attributes: ["id", "name"] }
+                    ]
+                });
+            } else {
+                ticket = await Ticket.findOne({
+                    where: {
+                        id: idTicket
+                    },
+                    include: [
+                        { model: Contact, as: "contact", attributes: ["id", "name"] }
+                    ]
+                });
+            }
+
+            isSwitchFlow = true;
+
+            switchFlow(msg, companyId, ticket);
+            break;
+        }
+
         let isRandomizer: boolean;
         if (nodeSelected.type === "randomizer") {
             const selectedRandom = randomizarCaminho(nodeSelected.data.percent / 100);
@@ -577,8 +609,8 @@ export const ActionsWebhookFacebookService = async (
             }
             isRandomizer = true;
         }
-        let isMenu: boolean;
 
+        let isMenu: boolean;
         if (nodeSelected.type === "menu") {
             if (pressKey) {
 
@@ -756,7 +788,6 @@ export const ActionsWebhookFacebookService = async (
             break;
         }
 
-
         ticket = await Ticket.findOne({
             where: { id: idTicket, companyId: companyId }
         });
@@ -793,19 +824,15 @@ const constructJsonLine = (line: string, json: any) => {
     return valor
 };
 
-
 function removerNaoLetrasNumeros(texto: string) {
     // Substitui todos os caracteres que não são letras ou números por vazio
     return texto.replace(/[^a-zA-Z0-9]/g, "");
 }
 
-
-
 const intervalWhats = (time: string) => {
     const seconds = parseInt(time) * 1000;
     return new Promise(resolve => setTimeout(resolve, seconds));
 };
-
 
 const replaceMessages = (
     message: string,
@@ -814,7 +841,6 @@ const replaceMessages = (
     dataNoWebhook?: any
 ) => {
     const matches = message.match(/\{([^}]+)\}/g);
-
 
     if (dataWebhook) {
         let newTxt = message.replace(/{+nome}+/, dataNoWebhook.nome);
@@ -862,7 +888,7 @@ async function updateQueueId(ticket: Ticket, companyId: number, queueId: number)
     await UpdateTicketService({
         ticketData: {
             status: "pending",
-            queueId: queueId 
+            queueId: queueId
         },
         ticketId: ticket.id,
         companyId
@@ -879,7 +905,6 @@ async function updateQueueId(ticket: Ticket, companyId: number, queueId: number)
 
 function convertAudio(inputFile: string): Promise<string> {
     let outputFile: string;
-
 
     if (inputFile.endsWith(".mp3")) {
         outputFile = inputFile.replace(".mp3", ".mp4");
@@ -902,3 +927,9 @@ function convertAudio(inputFile: string): Promise<string> {
     });
 
 }
+
+const switchFlow = async (msg: proto.IWebMessageInfo, companyId: number, ticket: Ticket) => {
+    const wbot = await getWbot(ticket?.whatsappId);
+    const whatsapp = await ShowWhatsAppService(wbot.id!, companyId);
+    flowBuilderQueue(ticket, msg, wbot, whatsapp, companyId, ticket?.contact, null);
+};

@@ -70,69 +70,78 @@ const TagModal = ({ open, onClose, tagId, kanban }) => {
 	const [colorPickerModalOpen, setColorPickerModalOpen] = useState(false);
 	const [lanes, setLanes] = useState([]);
 	const [loading, setLoading] = useState(false);
-	const [selectedLane, setSelectedLane] = useState([]);
-	const [selectedRollbackLane, setSelectedRollbackLane] = useState([]);
-
+	const [selectedLane, setSelectedLane] = useState(null);
+	const [selectedRollbackLane, setSelectedRollbackLane] = useState(null);
 
 	const initialState = {
 		name: "",
 		color: getRandomHexColor(),
-		kanban: kanban,
+		kanban: kanban || 0,
 		timeLane: 0,
 		nextLaneId: 0,
 		greetingMessageLane: "",
 		rollbackLaneId: 0,
 	};
 
-	const [tag, setTag] = useState(initialState);
+	const [formData, setFormData] = useState(initialState);
 
 	useEffect(() => {
-		setLoading(true);
-		const delayDebounceFn = setTimeout(() => {
-			const fetchTags = async () => {
-				try {
-					const { data } = await api.get("/tags/", {
-						params: { kanban: 1, tagId },
-					});
-					setLanes(data.tags);
-				} catch (err) {
-					toastError(err);
-				}
-			};
-			fetchTags();
-		}, 500);
-		return () => clearTimeout(delayDebounceFn);
-	}, []);
-
-	useEffect(() => {
-		try {
-			(async () => {
-				if (!tagId) return;
-
-				const { data } = await api.get(`/tags/${tagId}`);
-				setTag(prevState => {
-					return { ...prevState, ...data };
+		const fetchLanes = async () => {
+			try {
+				const { data } = await api.get("/tags/", {
+					params: { kanban: 1, tagId },
 				});
-				if (data.nextLaneId) {
-					setSelectedLane(data.nextLaneId);
-				}
-				if (data.rollbackLaneId) {
-					setSelectedRollbackLane(data.rollbackLaneId);
-				}
-			})()
-		} catch (err) {
-			toastError(err);
+				setLanes(data.tags);
+				setLoading(false);
+			} catch (err) {
+				toastError(err);
+				setLoading(false);
+			}
+		};
+
+		if (open) {
+			setLoading(true);
+			fetchLanes();
+		}
+	}, [open, tagId]);
+
+	useEffect(() => {
+		const fetchTag = async () => {
+			try {
+				const { data } = await api.get(`/tags/${tagId}`);
+				setFormData(prev => ({ ...initialState, ...data }));
+				setSelectedLane(data.nextLaneId || null);
+				setSelectedRollbackLane(data.rollbackLaneId || null);
+			} catch (err) {
+				toastError(err);
+			}
+		};
+
+		if (open && tagId) {
+			fetchTag();
+		} else if (open) {
+			setFormData(initialState);
+			setSelectedLane(null);
+			setSelectedRollbackLane(null);
 		}
 	}, [tagId, open]);
 
 	const handleClose = () => {
-		setTag(initialState);
+		setFormData(initialState);
 		setColorPickerModalOpen(false);
+		setSelectedLane(null);
+		setSelectedRollbackLane(null);
 		onClose();
 	};
 
 	const handleSaveTag = async values => {
-		const tagData = { ...values, userId: user?.id, kanban: kanban, nextLaneId: selectedLane || null, rollbackLaneId: selectedRollbackLane || null };
+		const tagData = {
+			...values,
+			userId: user?.id,
+			kanban: kanban,
+			nextLaneId: selectedLane,
+			rollbackLaneId: selectedRollbackLane
+		};
 
 		try {
 			if (tagId) {
@@ -140,12 +149,11 @@ const TagModal = ({ open, onClose, tagId, kanban }) => {
 			} else {
 				await api.post("/tags", tagData);
 			}
-			toast.success(kanban === 0 ? `${i18n.t("tagModal.success")}` : `${i18n.t("tagModal.successKanban")}`);
-
+			toast.success(kanban === 0 ? i18n.t("tagModal.success") : i18n.t("tagModal.successKanban"));
+			handleClose();
 		} catch (err) {
 			toastError(err);
 		}
-		handleClose();
 	};
 
 	function getRandomHexColor() {
@@ -169,186 +177,157 @@ const TagModal = ({ open, onClose, tagId, kanban }) => {
 				fullWidth
 				scroll="paper"
 			>
-				<DialogTitle id="form-dialog-title">
-					{(tagId ? (kanban === 0 ? `${i18n.t("tagModal.title.edit")}` : `${i18n.t("tagModal.title.editKanban")}`) :
-						(kanban === 0 ? `${i18n.t("tagModal.title.add")}` : `${i18n.t("tagModal.title.addKanban")}`))
+				<DialogTitle>
+					{tagId 
+						? kanban === 0 
+							? i18n.t("tagModal.title.edit")
+							: i18n.t("tagModal.title.editKanban")
+						: kanban === 0
+							? i18n.t("tagModal.title.add")
+							: i18n.t("tagModal.title.addKanban")
 					}
 				</DialogTitle>
 				<Formik
-					initialValues={tag}
+					initialValues={formData}
 					enableReinitialize={true}
 					validationSchema={TagSchema}
-					onSubmit={(values, actions) => {
-						setTimeout(() => {
-							handleSaveTag(values);
-							actions.setSubmitting(false);
-						}, 400);
-					}}
+					onSubmit={handleSaveTag}
 				>
-					{({ touched, errors, isSubmitting, values }) => (
+					{({ touched, errors, isSubmitting, values, handleChange }) => (
 						<Form>
 							<DialogContent dividers>
 								<Grid container spacing={1}>
-									<Grid item xs={12} md={12} xl={12}>
+									<Grid item xs={12}>
 										<Field
 											as={TextField}
 											label={i18n.t("tagModal.form.name")}
 											name="name"
+											fullWidth
 											error={touched.name && Boolean(errors.name)}
 											helperText={touched.name && errors.name}
 											variant="outlined"
 											margin="dense"
-											onChange={(e) => setTag(prev => ({ ...prev, name: e.target.value }))}
-											fullWidth
-
+											autoFocus
 										/>
 									</Grid>
-									<Grid item xs={12} md={12} xl={12}>
+									<Grid item xs={12}>
 										<Field
 											as={TextField}
-											fullWidth
 											label={i18n.t("tagModal.form.color")}
 											name="color"
-											autoFocus
-											id="color"
-											error={touched.color && Boolean(errors.color)}
-											helperText={touched.color && errors.color}
+											fullWidth
+											variant="outlined"
+											margin="dense"
 											InputProps={{
 												startAdornment: (
 													<InputAdornment position="start">
 														<div
 															style={{ backgroundColor: values.color }}
 															className={classes.colorAdorment}
-														></div>
+														/>
 													</InputAdornment>
 												),
 												endAdornment: (
 													<IconButton
-														size="small"
-														color="default"
 														onClick={() => setColorPickerModalOpen(!colorPickerModalOpen)}
 													>
 														<Colorize />
 													</IconButton>
 												),
 											}}
-											variant="outlined"
-											margin="dense"
 										/>
-
 										{colorPickerModalOpen && (
-											<div>
-												<ColorBox
-													disableAlpha={true}
-													hslGradient={false}
-													style={{ margin: '20px auto 0' }}
-													value={tag.color}
-													onChange={val => {
-														setTag(prev => ({ ...prev, color: `#${val.hex}` }));
-													}}
-												/>
-											</div>
+											<ColorBox
+												disableAlpha
+												hslGradient={false}
+												style={{ margin: '20px auto 0' }}
+												value={values.color}
+												onChange={val => {
+													handleChange({
+														target: {
+															name: 'color',
+															value: `#${val.hex}`
+														}
+													});
+												}}
+											/>
 										)}
 									</Grid>
 
 									{kanban === 1 && (
 										<>
-											<Grid item xs={12} md={6} xl={6}>
+											<Grid item xs={12} md={6}>
 												<Field
 													as={TextField}
 													label={i18n.t("tagModal.form.timeLane")}
 													name="timeLane"
-													error={touched.timeLane && Boolean(errors.timeLane)}
-													helperText={touched.timeLane && errors.timeLane}
+													fullWidth
 													variant="outlined"
 													margin="dense"
-													onChange={(e) => setTag(prev => ({ ...prev, timeLane: e.target.value }))}
-													fullWidth
+													type="number"
 												/>
 											</Grid>
-											<Grid item xs={12} md={6} xl={6}>
+											<Grid item xs={12} md={6}>
 												<FormControl
 													variant="outlined"
 													margin="dense"
 													fullWidth
-													className={classes.formControl}
 												>
-													<InputLabel id="whatsapp-selection-label">
+													<InputLabel>
 														{i18n.t("tagModal.form.nextLaneId")}
 													</InputLabel>
-													<Field
-														as={Select}
+													<Select
+														value={selectedLane || ''}
+														onChange={(e) => setSelectedLane(e.target.value)}
 														label={i18n.t("tagModal.form.nextLaneId")}
-														placeholder={i18n.t("tagModal.form.nextLaneId")}
-														labelId="whatsapp-selection-label"
-														id="nextLaneId"
-														name="nextLaneId"
-														style={{ left: "-7px" }}
-														error={touched.nextLaneId && Boolean(errors.nextLaneId)}
-														value={selectedLane}
-														onChange={(e) => setSelectedLane(e.target.value || null)}
 													>
-														<MenuItem value={null}>&nbsp;</MenuItem>
-														{lanes &&
-															lanes.map((lane) => (
-																<MenuItem key={lane.id} value={lane.id}>
-																	{lane.name}
-																</MenuItem>
-															))}
-													</Field>
+														<MenuItem value="">&nbsp;</MenuItem>
+														{lanes.map((lane) => (
+															<MenuItem key={lane.id} value={lane.id}>
+																{lane.name}
+															</MenuItem>
+														))}
+													</Select>
 												</FormControl>
 											</Grid>
-											<Grid item xs={12} md={12} xl={12}>
+											<Grid item xs={12}>
 												<Field
 													as={TextField}
 													label={i18n.t("tagModal.form.greetingMessageLane")}
 													name="greetingMessageLane"
-													rows={5}
+													fullWidth
 													multiline
-													error={touched.greetingMessageLane && Boolean(errors.greetingMessageLane)}
-													helperText={touched.greetingMessageLane && errors.greetingMessageLane}
+													rows={4}
 													variant="outlined"
 													margin="dense"
-													onChange={(e) => setTag(prev => ({ ...prev, greetingMessageLane: e.target.value }))}
-													fullWidth
 												/>
 											</Grid>
-											<Grid item xs={12} md={12} xl={12}>
+											<Grid item xs={12}>
 												<FormControl
 													variant="outlined"
 													margin="dense"
 													fullWidth
-													className={classes.formControl}
 												>
-													<InputLabel id="whatsapp-selection-label">
+													<InputLabel>
 														{i18n.t("tagModal.form.rollbackLaneId")}
 													</InputLabel>
-													<Field
-														as={Select}
-														label={i18n.t("tagModal.form.rollbackLaneId")}
-														placeholder={i18n.t("tagModal.form.rollbackLaneId")}
-														labelId="whatsapp-selection-label"
-														id="rollbackLaneId"
-														name="rollbackLaneId"
-														style={{ left: "-7px" }}
-														error={touched.rollbackLaneId && Boolean(errors.rollbackLaneId)}
-														value={selectedRollbackLane}
+													<Select
+														value={selectedRollbackLane || ''}
 														onChange={(e) => setSelectedRollbackLane(e.target.value)}
+														label={i18n.t("tagModal.form.rollbackLaneId")}
 													>
-														<MenuItem value={null}>&nbsp;</MenuItem>
-														{lanes &&
-															lanes.map((lane) => (
-																<MenuItem key={lane.id} value={lane.id}>
-																	{lane.name}
-																</MenuItem>
-															))}
-													</Field>
+														<MenuItem value="">&nbsp;</MenuItem>
+														{lanes.map((lane) => (
+															<MenuItem key={lane.id} value={lane.id}>
+																{lane.name}
+															</MenuItem>
+														))}
+													</Select>
 												</FormControl>
 											</Grid>
 										</>
 									)}
 								</Grid>
-
 							</DialogContent>
 							<DialogActions>
 								<Button
@@ -367,8 +346,8 @@ const TagModal = ({ open, onClose, tagId, kanban }) => {
 									className={classes.btnWrapper}
 								>
 									{tagId
-										? `${i18n.t("tagModal.buttons.okEdit")}`
-										: `${i18n.t("tagModal.buttons.okAdd")}`}
+										? i18n.t("tagModal.buttons.okEdit")
+										: i18n.t("tagModal.buttons.okAdd")}
 									{isSubmitting && (
 										<CircularProgress
 											size={24}

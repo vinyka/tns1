@@ -53,9 +53,7 @@ const BlockUnblockContactService = async ({
 
     if (active) {
         try {
-            //const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
-
-            const whatsappCompany = null;
+            const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
 
             const wbot = getWbot(whatsappCompany.id);
 
@@ -72,10 +70,8 @@ const BlockUnblockContactService = async ({
 
     if (!active) {
          try {
-            //const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
+            const whatsappCompany = await GetDefaultWhatsApp(Number(companyId))
 
-            const whatsappCompany = null;
-            
             const wbot = getWbot(whatsappCompany.id);
 
             const jid = createJid(contact.number);

@@ -191,7 +191,8 @@ export default function AnnouncementsPopover() {
 
   const fetchAnnouncements = async () => {
     try {
-      const { data } = await api.get("/announcements/", {
+      // Usar nova rota que filtra por empresa
+      const { data } = await api.get("/announcements/for-company", {
         params: { searchParam, pageNumber },
       });
       dispatch({ type: "LOAD_ANNOUNCEMENTS", payload: data.records });

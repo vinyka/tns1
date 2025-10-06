@@ -148,6 +148,7 @@ const FlowBuilderAddAudioModal = ({ open, onSave, onUpdate, data, close }) => {
       });
 
       setTimeout(async () => {
+        // console.log(formData);
         await api.post("/flowbuilder/audio", formData).then(res => {
           handleClose();
           onSave({

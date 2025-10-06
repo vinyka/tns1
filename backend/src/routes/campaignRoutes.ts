@@ -8,7 +8,8 @@ import uploadConfig from "../config/upload";
 const upload = multer(uploadConfig);
 
 const routes = express.Router();
-
+routes.get("/campaigns/:id/recurrence-preview", isAuth, CampaignController.previewRecurrence);
+routes.post("/campaigns/:id/stop-recurrence", isAuth, CampaignController.stopRecurrence);
 routes.get("/campaigns/list", isAuth, CampaignController.findList);
 routes.get("/campaigns", isAuth, CampaignController.index);
 routes.get("/campaigns/:id", isAuth, CampaignController.show);

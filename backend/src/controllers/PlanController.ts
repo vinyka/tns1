@@ -45,9 +45,9 @@ type StorePlanData = {
   useExternalApi?: boolean;
   useKanban?: boolean;
   useOpenAi?: boolean;
-  useAudioTranscription?: boolean;
   useIntegrations?: boolean;
   isPublic?: boolean;
+  useWhatsappOfficial?: boolean;
 };
 
 type UpdatePlanData = {
@@ -66,9 +66,9 @@ type UpdatePlanData = {
   useExternalApi?: boolean;
   useKanban?: boolean;
   useOpenAi?: boolean;
-  useAudioTranscription?: boolean;
   useIntegrations?: boolean;
   isPublic?: boolean;
+  useWhatsappOfficial?: boolean;
 };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {

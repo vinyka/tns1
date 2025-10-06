@@ -94,6 +94,7 @@ const ticketSortDesc = (a, b) => {
 }
 
 const reducer = (state, action) => {
+    //console.log("action", action, state)
     const sortDir = action.sortDir;
     
     if (action.type === "LOAD_TICKETS") {
@@ -279,6 +280,7 @@ const TicketsListCustom = (props) => {
             ticket.queueId && selectedQueueIds.indexOf(ticket.queueId) === -1;
 
         const onCompanyTicketTicketsList = (data) => {
+            // console.log("onCompanyTicketTicketsList", data)
             if (data.action === "updateUnread") {
                 dispatch({
                     type: "RESET_UNREAD",
@@ -287,6 +289,7 @@ const TicketsListCustom = (props) => {
                     sortDir: sortTickets
                 });
             }
+            // console.log(shouldUpdateTicket(data.ticket))
             if (data.action === "update" &&
                 shouldUpdateTicket(data.ticket) && data.ticket.status === status) {
                 dispatch({
@@ -422,6 +425,8 @@ const TicketsListCustom = (props) => {
                     ) : (
                         <>
                             {ticketsList.map((ticket) => (
+                                // <List key={ticket.id}>
+                                //     {console.log(ticket)}
                                 <TicketListItem
                                     ticket={ticket}
                                     key={ticket.id}

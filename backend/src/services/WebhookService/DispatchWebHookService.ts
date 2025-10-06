@@ -8,7 +8,6 @@ import CreateMessageService, {
 import { Request, Response } from "express";
 import { ActionsWebhookService } from "./ActionsWebhookService";
 import Whatsapp from "../../models/Whatsapp";
-import QueueIntegrations from "../../models/QueueIntegrations";
 
 interface RequestLocal {
   companyId: number;
@@ -38,7 +37,6 @@ export interface INodes {
     sec?: string
     message?: string
     arrayOption?: IArrayOption[]
-    typebotIntegration?: QueueIntegrations
   };
   type: string;
   style: { backgroundColor: string; color: string };
@@ -108,7 +106,7 @@ const DispatchWebHookService = async ({
         whatsappIds.push(usuario.toJSON());
       });
       ActionsWebhookService(
-        0,
+        whatsappIds[0].id, //possivel bug aqui
         webhook.config["details"].idFlow,
         companyId,
         nodes,

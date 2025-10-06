@@ -73,6 +73,7 @@ export function ContactNotes({ ticket }) {
     }
 
     const handleEdit = (note) => {
+        console.log(note)
         setEditingNote(note);
     };
 

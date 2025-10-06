@@ -1,6 +1,6 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
 import {
-  Box,
+  Button,
+  ClickAwayListener,
   FormControl,
   IconButton,
   Input,
@@ -8,19 +8,58 @@ import {
   makeStyles,
   Paper,
   Typography,
-  CircularProgress,
-  LinearProgress,
+  Avatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  List,
+  ListItem,
+  ListItemText,
 } from "@material-ui/core";
+import MoodIcon from "@material-ui/icons/Mood";
 import SendIcon from "@material-ui/icons/Send";
+import { Picker } from "emoji-mart";
+import "emoji-mart/css/emoji-mart.css";
+import React, {
+  Fragment,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { useDate } from "../../hooks/useDate";
 import api from "../../services/api";
-import ChatFilePreview from "./ChatFilePreview";
-import ChatFileMessage from "./ChatFileMessage";
-import ChatFileUpload from "./ChatFileUpload";
-import ChatAudioRecorder from "./ChatAudioRecorder";
-import ChatAudioPlayer from "./ChatAudioPlayer";
+import { i18n } from "../../translate/i18n";
+
+import { GetApp } from "@mui/icons-material";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import CancelIcon from "@mui/icons-material/Cancel";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import HighlightOffIcon from "@mui/icons-material/HighlightOff";
+import MicIcon from "@mui/icons-material/Mic";
+import CircularProgress from "@mui/material/CircularProgress";
+import { green } from "@mui/material/colors";
+import MicRecorder from "mic-recorder-to-mp3";
+import MarkdownWrapper from "../../components/MarkdownWrapper";
+import RecordingTimer from "../../components/MessageInput/RecordingTimer";
+import ModalImageCors from "../../components/ModalImageCors";
+import toastError from "../../errors/toastError";
+import AudioModal from "../../components/AudioModal";
+import DocumentModal from "../../components/DocumentModal";
+
+import whatsBackground from "../../assets/wa-background.png";
+import whatsBackgroundDark from "../../assets/wa-background-dark.png";
+import { format, isSameDay, parseISO } from "date-fns";
+import ReplyIcon from "@mui/icons-material/Reply";
+import CloseIcon from "@mui/icons-material/Close";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ForwardIcon from "@mui/icons-material/Forward";
+import IosShareIcon from "@mui/icons-material/IosShare";
 
 const useStyles = makeStyles((theme) => ({
   mainContainer: {
@@ -38,7 +77,11 @@ const useStyles = makeStyles((theme) => ({
     overflowY: "auto",
     height: "100%",
     ...theme.scrollbarStyles,
-    backgroundColor: theme.mode === 'light' ? "#f2f2f2" : "#7f7f7f",
+    backgroundImage:
+      theme.mode === "light"
+        ? `url(${whatsBackground})`
+        : `url(${whatsBackgroundDark})`,
+    backgroundColor: theme.mode === "light" ? "transparent" : "#0b0b0d",
   },
   inputArea: {
     position: "relative",
@@ -50,69 +93,218 @@ const useStyles = makeStyles((theme) => ({
   buttonSend: {
     margin: theme.spacing(1),
   },
-  uploadInput: {
-    display: "none",
-  },
-  buttonAttach: {
-    margin: theme.spacing(1),
-  },
-  previewArea: {
-    padding: "10px 15px",
+  messageContainer: {
     display: "flex",
-    flexWrap: "wrap",
-    gap: 8,
-    background: theme.palette.background.default,
-    borderTop: "1px solid rgba(0, 0, 0, 0.12)",
-  },
-  uploadProgress: {
-    width: "100%",
-    marginTop: 5,
-  },
-  boxLeft: {
-    padding: "10px 10px 5px",
     margin: "10px",
+    alignItems: "center",
+  },
+  messageContainerSelf: {
+    display: "flex",
+    margin: "10px",
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  messageContainerWithAvatar: {
+    display: "flex",
+    margin: "10px",
+    alignItems: "flex-start",
+  },
+  avatarContainer: {
+    marginRight: 10,
+    display: "flex",
+    alignItems: "center",
+    alignSelf: "center",
+  },
+  messageBubble: {
+    padding: "15px",
     position: "relative",
     backgroundColor: "#ffffff",
     color: "#303030",
-    maxWidth: 300,
-    minWidth: 60,
-    display: "inline-block",
-    width: "auto",
-    borderRadius: 10,
-    borderBottomLeftRadius: 0,
+    maxWidth: 350,
+    width: "100%",
+    borderRadius: 20,
     border: "1px solid rgba(0, 0, 0, 0.12)",
   },
-  boxRight: {
-    padding: "10px 10px 5px",
-    margin: "10px 10px 10px auto",
+  messageBubbleSelf: {
+    padding: "15px",
     position: "relative",
     backgroundColor: "#dcf8c6",
     color: "#303030",
-    textAlign: "right",
-    maxWidth: 300,
-    minWidth: 60,
-    display: "inline-block",
-    width: "auto",
-    borderRadius: 10,
-    borderBottomRightRadius: 0,
+    maxWidth: 350,
+    width: "100%",
+    borderRadius: 20,
     border: "1px solid rgba(0, 0, 0, 0.12)",
   },
-  messageListLoading: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100%",
+  bubbleContent: {
+    marginTop: 5,
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    overflowWrap: "break-word",
   },
-  messageListEmpty: {
+  senderInfo: {
     display: "flex",
-    justifyContent: "center",
+    justifyContent: "space-between",
     alignItems: "center",
-    height: "100%",
+    marginBottom: 5,
   },
-  timestamp: {
-    marginLeft: theme.spacing(1),
+  senderName: {
+    fontWeight: "bold",
+  },
+  sendMessageIcons: {
+    color: "grey",
+  },
+  uploadInput: {
+    display: "none",
+  },
+  circleLoading: {
+    color: green[500],
+    opacity: "70%",
+    position: "absolute",
+    top: "20%",
+    left: "50%",
+    marginLeft: -12,
+  },
+  viewMediaInputWrapper: {
+    display: "flex",
+    padding: "10px 13px",
+    position: "relative",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#eee",
+    borderTop: "1px solid rgba(0, 0, 0, 0.12)",
+  },
+  downloadMedia: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "inherit",
+    padding: 10,
+  },
+  messageMedia: {
+    objectFit: "cover",
+    width: 250,
+    height: 200,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  recorderWrapper: {
+    display: "flex",
+    alignItems: "center",
+    alignContent: "middle",
+    justifyContent: "flex-end",
+  },
+  cancelAudioIcon: {
+    color: "red",
+  },
+  audioLoading: {
+    color: green[500],
+    opacity: "70%",
+  },
+  sendAudioIcon: {
+    color: "green",
+  },
+  messageDate: {
+    fontSize: "0.75rem",
+    color: "#666",
+    marginTop: 5,
+  },
+  emojiBox: {
+    position: "absolute",
+    bottom: 63,
+    left: 10,
+    zIndex: 1000,
+  },
+  sendMessageIcons: {
+    color: "grey",
+  },
+  dailyTimestampText: {
+    color: "#808888",
+    padding: 8,
+    textAlign: "center",
+    width: "100%",
+    display: "block",
+    margin: "0 auto",
+  },
+  replyContainer: {
+    display: "flex",
+    alignItems: "center",
+    padding: "8px 16px",
+    backgroundColor: "#f0f2f5",
+    borderTop: "1px solid rgba(0, 0, 0, 0.12)",
+  },
+  replyContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  replyText: {
+    fontSize: "0.875rem",
+    color: "#666",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  replySender: {
+    fontSize: "0.75rem",
+    color: "#999",
+  },
+  messageActions: {
+    display: "flex",
+    gap: 4,
+    marginLeft: 8,
+  },
+  replyPreview: {
+    borderLeft: "3px solid #128C7E",
+    paddingLeft: "8px",
+    marginBottom: "8px",
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    borderRadius: "4px",
+    padding: "4px 8px",
+  },
+  replyPreviewSender: {
+    fontSize: "0.75rem",
+    color: "#128C7E",
+    fontWeight: "bold",
+  },
+  replyPreviewText: {
+    fontSize: "0.75rem",
+    color: "#666",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  dailyTimestamp: {
+    width: "100%",
+    display: "block",
+  },
+  highlightedMessage: {
+    backgroundColor: "#ffe082",
+    transition: "background 0.5s",
+  },
+  forwardedMessage: {
+    // borderLeft: "3px solid #128C7E",
+    // paddingLeft: "8px",
+    // marginBottom: "8px",
+    // backgroundColor: "rgba(0, 0, 0, 0.05)",
+    // borderRadius: "4px",
+    // padding: "4px 8px",
+  },
+  forwardedMessageHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    color: "#999",
+    fontSize: "0.75rem",
+    marginBottom: "4px",
+  },
+  forwardedMessageText: {
+    // fontSize: "0.875rem",
+    // color: "#666",
   },
 }));
+
+const Mp3Recorder = new MicRecorder({ bitRate: 128 });
 
 export default function ChatMessages({
   chat,
@@ -121,18 +313,33 @@ export default function ChatMessages({
   handleLoadMore,
   scrollToBottomRef,
   pageInfo,
-  loading,
-  onMessagesUpdate,
+  loadingMore,
+  onEdit,
+  onDelete,
+  onForward,
+  // messageListRef,
+  // isFirstPage,
+  justOpenedChat,
+  setJustOpenedChat,
+  addOptimisticMessage,
 }) {
+  const topRef = useRef(null);
+
   const classes = useStyles();
-  const { user, socket } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const { datetimeToClient } = useDate();
   const baseRef = useRef();
+  const messageRefs = useRef({});
 
   const [contentMessage, setContentMessage] = useState("");
-  const [selectedFiles, setSelectedFiles] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
+  const [medias, setMedias] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const inputRef = useRef();
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [initialScrollDone, setInitialScrollDone] = useState(false);
+  const [canLoadMore, setCanLoadMore] = useState(false);
 
   const scrollToBottom = () => {
     if (baseRef.current) {
@@ -141,613 +348,873 @@ export default function ChatMessages({
   };
 
   const unreadMessages = (chat) => {
-    if (chat !== undefined) {
+    if (chat && chat.users && Array.isArray(chat.users)) {
       const currentUser = chat.users.find((u) => u.userId === user.id);
-      return currentUser.unreads > 0;
+      return currentUser && currentUser.unreads > 0;
     }
-    return 0;
+    return false;
   };
 
   useEffect(() => {
-    if (unreadMessages(chat) > 0) {
+    if (justOpenedChat) {
+      setInitialScrollDone(false);
+    }
+  }, [justOpenedChat]);
+
+  useEffect(() => {
+    if (chat && chat.id && unreadMessages(chat)) {
       try {
         api.post(`/chats/${chat.id}/read`, { userId: user.id });
-      } catch (err) {}
+      } catch (err) {
+        console.error("Erro ao marcar mensagens como lidas:", err);
+      }
     }
     scrollToBottomRef.current = scrollToBottom;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!messages || messages.length === 0 || loadingMore || initialScrollDone)
+      return;
+
+    const scrollToBottomSafely = () => {
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const container = document.querySelector(".messageList");
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+            setInitialScrollDone(true);
+          }
+        }, 100); // Aumentar o timeout para dar tempo das mensagens renderizarem
+      });
+    };
+
+    scrollToBottomSafely();
+  }, [messages, loadingMore, initialScrollDone]);
+
+  // Após o scroll automático inicial, liberar o carregamento incremental
+  useEffect(() => {
+    if (!loading && !loadingMore && initialScrollDone) {
+      setCanLoadMore(true);
+    }
+  }, [loading, loadingMore, initialScrollDone]);
+
+  // Adicionar um useEffect separado para quando justOpenedChat muda
+  useEffect(() => {
+    if (justOpenedChat && messages && messages.length > 0) {
+      const scrollToBottomSafely = () => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            const container = document.querySelector(".messageList");
+            if (container) {
+              container.scrollTop = container.scrollHeight;
+              setJustOpenedChat(false); // Resetar após executar o scroll
+            }
+          }, 200); // Timeout maior para garantir que tudo foi renderizado
+        });
+      };
+
+      scrollToBottomSafely();
+    }
+  }, [justOpenedChat, messages]);
+
   const handleScroll = (e) => {
-    const { scrollTop } = e.currentTarget;
-    if (!pageInfo.hasMore || loading) return;
-    if (scrollTop < 600) {
+    if (!initialScrollDone || !canLoadMore) return;
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+
+    if (!pageInfo?.hasMore || loading) return;
+
+    if (scrollTop < 200) {
+      console.log("Carregando mais mensagens... ScrollTop:", scrollTop);
       handleLoadMore();
     }
   };
 
-  const handleSend = async () => {
-    if (contentMessage.trim() === "" && selectedFiles.length === 0) return;
-    
-    if (selectedFiles.length > 0) {
-      setIsUploading(true);
-      const formData = new FormData();
-      selectedFiles.forEach(file => {
-        formData.append("files", file);
-      });
-      
-      if (contentMessage.trim() !== "") {
-        formData.append("message", contentMessage);
-      }
-      
-      try {
-        // Criar uma mensagem provisória para feedback imediato ao usuário
-        const tempMessage = {
-          id: `temp-${Date.now()}`,
-          message: contentMessage,
-          fromMe: true,
-          senderId: user.id,
-          sender: { id: user.id, name: user.name },
-          createdAt: new Date().toISOString(),
-          isUploading: true,
-          files: selectedFiles.map(file => ({
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            url: URL.createObjectURL(file),
-            isUploading: true
-          }))
-        };
-        
-        // Adicionar a mensagem temporária ao estado local
-        const updatedMessages = [...messages, tempMessage];
-        // Aqui precisamos atualizar o estado global das mensagens
-        // Se você estiver usando redux ou context, dispatch a ação apropriada
-        // Por exemplo:
-        // dispatch({ type: 'SET_MESSAGES', payload: updatedMessages });
-        
-        // Se você não tiver acesso direto ao estado global, você pode passar uma callback
-        // para o componente pai que atualiza o estado
-        if (typeof onMessagesUpdate === 'function') {
-          onMessagesUpdate(updatedMessages);
-        }
-        
-        const response = await api.post(`/chats/${chat.id}/messages/upload`, formData, {
-          onUploadProgress: progressEvent => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setUploadProgress(percentCompleted);
-            
-            // Atualizar o progresso da mensagem temporária
-            const updatedMessagesWithProgress = messages.map(msg => 
-              msg.id === tempMessage.id 
-                ? { ...msg, uploadProgress: percentCompleted } 
-                : msg
-            );
-            
-            if (typeof onMessagesUpdate === 'function') {
-              onMessagesUpdate(updatedMessagesWithProgress);
-            }
-          }
-        });
-        
-        // Remover a mensagem temporária e adicionar a mensagem real retornada pelo servidor
-        const newMessage = response.data;
-        
-        const updatedMessagesAfterUpload = messages
-          .filter(msg => msg.id !== tempMessage.id)
-          .concat(newMessage);
-          
-        if (typeof onMessagesUpdate === 'function') {
-          onMessagesUpdate(updatedMessagesAfterUpload);
-        }
-        
-        setSelectedFiles([]);
-        setContentMessage("");
-        setUploadProgress(0);
-        
-        // Forçar scroll para o fim após adicionar nova mensagem
-        setTimeout(() => {
-          if (scrollToBottomRef.current) {
-            scrollToBottomRef.current();
-          }
-        }, 200);
-      } catch (err) {
-        console.error(err);
-        window.alert("Erro ao enviar arquivos. Tente novamente.");
-        
-        // Remover a mensagem temporária em caso de erro
-        const updatedMessagesAfterError = messages
-          .filter(msg => msg.id !== `temp-${Date.now()}`);
-          
-        if (typeof onMessagesUpdate === 'function') {
-          onMessagesUpdate(updatedMessagesAfterError);
-        }
-      } finally {
-        setIsUploading(false);
-      }
-    } else if (contentMessage.trim() !== "") {
-      handleSendMessage(contentMessage);
-      setContentMessage("");
+  const handleChangeMedias = (e) => {
+    if (!e.target.files) {
+      return;
+    }
+
+    const selectedMedias = Array.from(e.target.files);
+    setMedias(selectedMedias);
+  };
+
+  const handlePaste = (e) => {
+    if (e.clipboardData.files.length > 0) {
+      const selectedMedias = Array.from(e.clipboardData.files);
+      setMedias(selectedMedias);
+      e.preventDefault();
     }
   };
 
-  const handleFilesSelected = (files, progressCallback, completeCallback) => {
-    // Verificar se recebemos arquivos válidos
-    if (!files || (Array.isArray(files) && files.length === 0)) {
-      if (completeCallback) completeCallback();
-      return;
+  const handleAddEmoji = (e) => {
+    let emoji = e.native;
+    setContentMessage((prevState) => prevState + emoji);
+    inputRef.current.focus();
+  };
+
+  const [documentModalOpen, setDocumentModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+
+  const checkMessageMedia = (message) => {
+    if (message.mediaType === "image") {
+      return <ModalImageCors imageUrl={message.mediaPath} />;
     }
-    
-    const formData = new FormData();
-    
-    // Se for um único arquivo (caso do áudio) ou uma lista de arquivos
-    if (files instanceof File) {
-      // Verificar se o arquivo tem tamanho válido
-      if (files.size === 0) {
-        window.alert("O arquivo de áudio está vazio. Tente gravar novamente com um microfone diferente.");
-        if (completeCallback) completeCallback();
-        return;
-      }
-      
-      // Para arquivos de áudio, verificar codec e converter se necessário
-      if (files.type.startsWith('audio/')) {
-        try {
-          // Determinar a extensão correta com base no tipo MIME
-          let audioExt = 'mp3';  // Padrão para compatibilidade máxima
-          
-          if (files.type === 'audio/webm') {
-            audioExt = 'webm';
-          } else if (files.type === 'audio/mp3' || files.type === 'audio/mpeg') {
-            audioExt = 'mp3';
-          } else if (files.type === 'audio/ogg') {
-            audioExt = 'ogg';
-          }
-                          
-          // Criar uma cópia do arquivo com nome garantido e verificar o tamanho novamente
-          const newFileName = `audio_${Date.now()}.${audioExt}`;
-          
-          // Ler o arquivo como ArrayBuffer para garantir que os dados estão intactos
-          const reader = new FileReader();
-          
-          // Usar uma Promise para trabalhar com o FileReader de forma assíncrona
-          const processAudioFile = new Promise((resolve, reject) => {
-            reader.onload = function(e) {
-              try {
-                if (!e.target.result || e.target.result.byteLength === 0) {
-                  reject(new Error("Não foi possível ler os dados do arquivo de áudio"));
-                  return;
-                }
-                
-                // Criar blob a partir do ArrayBuffer
-                const audioBlob = new Blob([e.target.result], { type: files.type });
-                
-                if (audioBlob.size === 0) {
-                  reject(new Error("Falha ao processar dados do áudio"));
-                  return;
-                }
-                
-                // Criar arquivo a partir do blob
-                const audioFile = new File([audioBlob], newFileName, { 
-                  type: files.type,
-                  lastModified: Date.now()
-                });
-                
-                resolve(audioFile);
-              } catch (error) {
-                reject(error);
-              }
-            };
-            
-            reader.onerror = function() {
-              reject(new Error("Erro ao ler o arquivo de áudio"));
-            };
-            
-            // Iniciar a leitura do arquivo
-            reader.readAsArrayBuffer(files);
-          });
-          
-          // Processar o arquivo e depois enviar para o servidor
-          processAudioFile
-            .then(audioFile => {
-              // Verificação final
-              if (audioFile.size === 0) {
-                window.alert("Erro ao processar o áudio. Tente novamente.");
-                if (completeCallback) completeCallback();
-                return;
-              }
-              
-              // Adiciona o arquivo ao FormData e envia
-              const audioFormData = new FormData();
-              audioFormData.append("files", audioFile);
-              
-              if (contentMessage.trim() !== "") {
-                audioFormData.append("message", contentMessage);
-              }
-              
-              api.post(`/chats/${chat.id}/messages/upload`, audioFormData, {
-                headers: {
-                  'Content-Type': 'multipart/form-data'
-                },
-                onUploadProgress: progressEvent => {
-                  const percentCompleted = Math.round(
-                    (progressEvent.loaded * 100) / progressEvent.total
-                  );
-                  if (progressCallback) progressCallback(percentCompleted);
-                }
-              })
-              .then((response) => {
-                setContentMessage("");
-                if (completeCallback) completeCallback();
-              })
-              .catch(err => {
-                window.alert("Erro ao enviar o áudio. Tente novamente.");
-                if (completeCallback) completeCallback();
-              });
-            })
-            .catch(error => {
-              window.alert("Não foi possível processar o arquivo de áudio. Tente novamente.");
-              if (completeCallback) completeCallback();
-            });
-          
-          // Retorna aqui pois o envio será tratado pela Promise
-          return;
-        } catch (error) {
-          window.alert("Erro ao processar o áudio. Tente novamente.");
-          if (completeCallback) completeCallback();
-          return;
-        }
-      } else {
-        formData.append("files", files);
-      }
+    if (message.mediaType === "audio") {
+      return (
+        <AudioModal
+          url={message.mediaPath}
+          message={message}
+          disableTranscription={!chat.isGroup}
+        />
+      );
+    }
+    if (message.mediaType === "video") {
+      return (
+        <video
+          className={classes.messageMedia}
+          src={message.mediaPath}
+          controls
+        />
+      );
     } else {
-      let validFilesCount = 0;
-      
-      Array.from(files).forEach(file => {
-        // Verificar se o arquivo tem tamanho válido
-        if (file.size === 0) {
-          return; // Pular este arquivo
-        }
-        
-        formData.append("files", file);
-        validFilesCount++;
-      });
-      
-      if (validFilesCount === 0) {
-        window.alert("Nenhum arquivo válido para enviar. Verifique se os arquivos selecionados não estão vazios.");
-        if (completeCallback) completeCallback();
-        return;
-      }
-    }
-    
-    // Adicionar mensagem de texto se houver
-    if (contentMessage.trim() !== "") {
-      formData.append("message", contentMessage);
-    }
-    
-    // Verificar se temos arquivos no FormData antes de enviar
-    const filesInFormData = formData.getAll("files");
-    if (filesInFormData.length === 0) {
-      window.alert("Erro: Nenhum arquivo válido para enviar.");
-      if (completeCallback) completeCallback();
-      return;
-    }
-    
-    // Verificar tamanho dos arquivos
-    const hasInvalidFiles = filesInFormData.some(file => file.size === 0);
-    if (hasInvalidFiles) {
-      if (!window.confirm("Alguns arquivos parecem estar vazios. Deseja continuar mesmo assim?")) {
-        if (completeCallback) completeCallback();
-        return;
-      }
-    }
-    
-    api.post(`/chats/${chat.id}/messages/upload`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      },
-      onUploadProgress: progressEvent => {
-        const percentCompleted = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
-        if (progressCallback) progressCallback(percentCompleted);
-      }
-    })
-      .then((response) => {
-        setContentMessage("");
-        if (completeCallback) completeCallback();
-      })
-      .catch(err => {
-        console.error("[ERROR] Falha no upload:", err.message);
-        console.error("[ERROR] Status:", err.response?.status);
-        console.error("[ERROR] Dados:", err.response?.data);
-        
-        // Mensagem mais específica com base no tipo de erro
-        let errorMessage = "Erro ao enviar arquivos. Tente novamente.";
-        
-        if (err.response?.status === 400) {
-          errorMessage = "Erro: O servidor não recebeu os arquivos corretamente. Tente novamente.";
-        } else if (err.response?.status === 413) {
-          errorMessage = "Erro: O arquivo é muito grande para upload. Tente um arquivo menor.";
-        } else if (err.response?.status >= 500) {
-          errorMessage = "Erro no servidor. Por favor, tente novamente mais tarde.";
-        }
-        
-        window.alert(errorMessage);
-        if (completeCallback) completeCallback();
-      });
-  };
-
-  const renderMessageContent = (message) => {
-    // Usar a função auxiliar para detectar mensagens do usuário
-    const isMe = isMessageFromMe(message, user.id);
-    
-    // Verificar se a mensagem tem arquivos
-    if (message.files && message.files.length > 0) {
-      // Verificar se há arquivos de áudio
-      const audioFiles = message.files.filter(file => {
-        const extension = file.name?.split('.').pop().toLowerCase();
-        return ['mp3', 'wav', 'ogg', 'opus'].includes(extension);
-      });
-
-      // Se for apenas áudio, renderizar o player sem exibir a mensagem de texto
-      if (audioFiles.length > 0 && audioFiles.length === message.files.length && !message.message) {
-        return (
-          <>
-            <ChatFileMessage 
-              files={message.files} 
-              isRight={isMe} 
-            />
-          </>
-        );
-      }
-    }
-
-    // Renderização padrão para mensagens normais ou mistas
-    return (
-      <>
-        {message.message && (
-          <Typography style={{ 
-            wordBreak: "break-word",
-            textAlign: isMe ? "right" : "left",
-            width: "100%"
-          }}>
-            {message.message}
-          </Typography>
-        )}
-        {message.files && message.files.length > 0 && (
-          <ChatFileMessage
-            files={message.files}
-            isRight={isMe}
-          />
-        )}
-      </>
-    );
-  };
-  
-  // Função auxiliar para determinar se uma mensagem é do usuário atual
-  const isMessageFromMe = (message, userId) => {
-    // Se fromMe estiver explicitamente definido, usá-lo como determinante
-    if (message.fromMe === true) {
-      return true;
-    } else if (message.fromMe === false) {
-      return false;
-    }
-    
-    // Se chegamos aqui, fromMe é undefined, então temos que usar outras heurísticas
-    // IMPORTANTE: Para evitar falsos positivos, vamos ser mais rigorosos
-    
-    // Para mensagens com remetentes indefinidos, considerar como não sendo do usuário atual
-    if (!message.senderId && !message.sender) {
-      return false;
-    }
-    
-    // Verificar IDs convertendo para string para garantir comparação correta
-    if (userId && message.senderId) {
-      return String(message.senderId) === String(userId);
-    }
-    
-    // Verificar ID no objeto sender se disponível
-    if (userId && message.sender && message.sender.id) {
-      return String(message.sender.id) === String(userId);
-    }
-    
-    // Se não conseguimos determinar com certeza, assumir que NÃO é do usuário atual
-    // para garantir que o nome do remetente sempre seja exibido
-    return false;
-  };
-
-  const renderMessages = () => {
-    if (loading && messages.length === 0) {
       return (
-        <div className={classes.messageListLoading}>
-          <CircularProgress />
-        </div>
-      );
-    }
-
-    if (messages.length === 0) {
-      return (
-        <div className={classes.messageListEmpty}>
-          <Typography variant="body1">
-            Nenhuma mensagem encontrada.
-          </Typography>
-        </div>
-      );
-    }
-
-    // Renderizar cada mensagem individualmente (sem agrupamento)
-    return messages.map((message) => {
-      const messageDate = datetimeToClient(message.createdAt);
-      
-      // Usar a função auxiliar para detectar mensagens do usuário
-      const isMe = isMessageFromMe(message, user.id);
-      
-      // Para debugging: forçar todas as mensagens a mostrar o nome do remetente
-      const forceShowSender = true; // Temporariamente mostrar todos os nomes para debug
-      
-      // Determinar o nome do remetente com fallbacks
-      const senderName = (() => {
-        // Se tiver um objeto sender, usar o nome dele
-        if (message.sender && message.sender.name) {
-          return message.sender.name;
-        }
-        
-        // Se tiver propriedade senderName, usar ela
-        if (message.senderName) {
-          return message.senderName;
-        }
-        
-        // Se tiver propriedade username, usar ela
-        if (message.username) {
-          return message.username;
-        }
-        
-        // Se tivermos um nome no objeto 'user' da mensagem
-        if (message.user && message.user.name) {
-          return message.user.name;
-        }
-        
-        // Verificar se existe nome do contato na mensagem
-        if (message.contact && message.contact.name) {
-          return message.contact.name;
-        }
-        
-        // Se tivermos o objeto chat e o id do remetente
-        if (chat && chat.users && message.senderId) {
-          const chatUser = chat.users.find(u => 
-            u.userId === message.senderId || 
-            u.id === message.senderId ||
-            String(u.userId) === String(message.senderId) ||
-            String(u.id) === String(message.senderId)
-          );
-          if (chatUser) {
-            return chatUser.name || chatUser.username || "Usuário";
-          }
-        }
-        
-        // Forçar um nome temporário para propósitos de debug
-        return "Remetente";
-      })();
-
-      return (
-        <div key={message.id} style={{ 
-          display: "flex", 
-          justifyContent: isMe ? "flex-end" : "flex-start",
-          width: "100%",
-          margin: "5px 0"
-        }}>
-          <div className={isMe ? classes.boxRight : classes.boxLeft}>
-            {/* Mostrar o nome do remetente se a mensagem não for do usuário atual OU se forceShowSender for true */}
-            {(!isMe || forceShowSender) && (
-              <Box display="flex" alignItems="center" mb={0.5} justifyContent={isMe ? "flex-end" : "flex-start"} width="100%">
-                <Typography 
-                  variant="caption" 
-                  style={{ 
-                    fontWeight: 'bold', 
-                    color: "#0000CC",
-                    fontSize: '0.85rem',
-                    textShadow: "0px 0px 1px rgba(0,0,0,0.1)"
-                  }}
-                >
-                  {senderName}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  style={{
-                    color: "#777",
-                    fontSize: '0.75rem',
-                    marginLeft: '4px'
-                  }}
-                >
-                  - {messageDate}
-                </Typography>
-              </Box>
-            )}
-            
-            {/* Indicador de upload em progresso */}
-            {message.isUploading && (
-              <Box mt={1} mb={1} width="100%">
-                <Typography variant="caption" style={{ display: 'block', marginBottom: 4 }}>
-                  Enviando... {message.uploadProgress ? `${message.uploadProgress}%` : ''}
-                </Typography>
-                <LinearProgress 
-                  variant={message.uploadProgress ? "determinate" : "indeterminate"}
-                  value={message.uploadProgress || 0}
-                />
-              </Box>
-            )}
-            
-            {/* Renderiza o conteúdo da mensagem */}
-            {renderMessageContent(message)}
+        <>
+          <div className={classes.downloadMedia}>
+            <Button
+              startIcon={<GetApp />}
+              color="primary"
+              variant="outlined"
+              onClick={() => {
+                setSelectedDocument(message);
+                setDocumentModalOpen(true);
+              }}
+            >
+              Visualizar Documento
+            </Button>
           </div>
-        </div>
+        </>
       );
+    }
+  };
+
+  const handleSendMedia = async (e) => {
+    setLoading(true);
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append("fromMe", true);
+    medias.forEach((media) => {
+      formData.append("typeArch", "chat");
+      formData.append("fileId", chat.id);
+      formData.append("medias", media);
+      formData.append("body", media.name);
     });
+
+    try {
+      await api.post(`/chats/${chat.id}/messages`, formData);
+    } catch (err) {
+      console.log(err);
+      toastError(err);
+    }
+
+    setLoading(false);
+    setMedias([]);
+  };
+
+  const handleStartRecording = async () => {
+    setLoading(true);
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      await Mp3Recorder.start();
+      setRecording(true);
+      setLoading(false);
+    } catch (err) {
+      toastError(err);
+      setLoading(false);
+    }
+  };
+
+  const handleUploadAudio = async () => {
+    setLoading(true);
+    try {
+      const [, blob] = await Mp3Recorder.stop().getMp3();
+
+      if (blob.size < 10000) {
+        setLoading(false);
+        setRecording(false);
+        return;
+      }
+
+      const formData = new FormData();
+      const filename = `audio-${new Date().getTime()}.mp3`;
+      formData.append("typeArch", "chat");
+      formData.append("fileId", chat.id);
+      formData.append("medias", blob, filename);
+      formData.append("body", filename);
+      formData.append("fromMe", true);
+
+      await api.post(`/chats/${chat.id}/messages`, formData);
+    } catch (err) {
+      toastError(err);
+    }
+
+    setRecording(false);
+    setLoading(false);
+  };
+
+  const handleCancelAudio = async () => {
+    try {
+      await Mp3Recorder.stop().getMp3();
+      setRecording(false);
+    } catch (err) {
+      toastError(err);
+    }
+  };
+
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
+  };
+
+  const handleSendMessageWithReply = async (content) => {
+    if (content.trim() !== "") {
+      // Adicione a mensagem localmente de forma otimista
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        chatId: chat.id,
+        senderId: user.id,
+        message: content,
+        createdAt: new Date().toISOString(),
+        sender: {
+          id: user.id,
+          name: user.name,
+          profileImage: user.profileImage,
+        },
+        replyTo: replyingTo,
+        isDeleted: false,
+        isEdited: false,
+        mediaType: "text",
+      };
+      addOptimisticMessage(optimisticMessage);
+      setContentMessage("");
+      setReplyingTo(null);
+      await api.post(`/chats/${chat.id}/messages`, {
+        message: content,
+        replyToId: replyingTo?.id,
+      });
+      // O socket vai substituir a mensagem otimista pela real depois
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey && contentMessage.trim() !== "") {
+      handleSendMessageWithReply(contentMessage);
+    }
+  };
+
+  const handleSendClick = () => {
+    if (contentMessage.trim() !== "") {
+      handleSendMessageWithReply(contentMessage);
+    }
+  };
+
+  const handleEdit = (message) => {
+    onEdit(message);
+  };
+
+  const handleDelete = (message) => {
+    onDelete(message);
+  };
+
+  const handleForward = (message) => {
+    onForward(message);
+  };
+
+  const renderDailyTimestamps = (
+    message,
+    index,
+    messagesList,
+    lastMessageRef,
+    classes
+  ) => {
+    const today = format(new Date(), "dd/MM/yyyy");
+
+    if (index === 0) {
+      return (
+        <span
+          className={classes.dailyTimestamp}
+          key={`timestamp-${message.id}`}
+        >
+          <div className={classes.dailyTimestampText}>
+            {today ===
+            format(parseISO(messagesList[index].createdAt), "dd/MM/yyyy")
+              ? "HOJE"
+              : format(parseISO(messagesList[index].createdAt), "dd/MM/yyyy")}
+          </div>
+        </span>
+      );
+    } else if (index < messagesList.length - 1) {
+      let messageDay = parseISO(messagesList[index].createdAt);
+      let previousMessageDay = parseISO(messagesList[index - 1].createdAt);
+
+      if (!isSameDay(messageDay, previousMessageDay)) {
+        return (
+          <span
+            className={classes.dailyTimestamp}
+            key={`timestamp-${message.id}`}
+          >
+            <div className={classes.dailyTimestampText}>
+              {today ===
+              format(parseISO(messagesList[index].createdAt), "dd/MM/yyyy")
+                ? "HOJE"
+                : format(parseISO(messagesList[index].createdAt), "dd/MM/yyyy")}
+            </div>
+          </span>
+        );
+      }
+    } else if (index === messagesList.length - 1) {
+      return (
+        <div
+          key={`ref-${message.id}`}
+          ref={lastMessageRef}
+          style={{ float: "left", clear: "both" }}
+        />
+      );
+    }
+  };
+
+  const scrollToMessage = (messageId) => {
+    const el = messageRefs.current[messageId];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add(classes.highlightedMessage);
+      setTimeout(() => el.classList.remove(classes.highlightedMessage), 1500);
+    }
   };
 
   return (
-    <Paper className={classes.mainContainer}>
-      <div onScroll={handleScroll} className={classes.messageList}>
-        {renderMessages()}
-        <div ref={baseRef}></div>
-      </div>
-      
-      {selectedFiles.length > 0 && (
-        <div className={classes.previewArea}>
-          <ChatFilePreview 
-            files={selectedFiles} 
-            onRemove={(index) => setSelectedFiles(prev => prev.filter((_, i) => i !== index))} 
-          />
-          {isUploading && (
-            <LinearProgress 
-              className={classes.uploadProgress} 
-              variant="determinate" 
-              value={uploadProgress} 
-            />
+    <>
+      <Paper
+        className={classes.paper}
+        style={{ display: "flex", flexDirection: "column", height: "100%" }}
+      >
+        {/* Área de mensagens rolável com background */}
+        <div
+          className={`messageList ${classes.messageList}`}
+          onScroll={handleScroll}
+          style={{ flex: 1, minHeight: 0 }}
+        >
+          <div ref={topRef} style={{ height: 1 }} />
+          {loadingMore && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                padding: "10px",
+                position: "sticky",
+                top: 0,
+                backgroundColor: "rgba(255, 255, 255, 0.9)",
+                zIndex: 1,
+              }}
+            >
+              <CircularProgress size={20} />
+              <Typography
+                variant="caption"
+                style={{ marginLeft: 8, alignSelf: "center" }}
+              >
+                Carregando mensagens antigas...
+              </Typography>
+            </div>
           )}
+
+          {Array.isArray(messages) &&
+            messages.map((item, key) => {
+              if (!item) return null;
+              const repliedMessage = item.replyTo;
+
+              return (
+                <React.Fragment key={key}>
+                  {renderDailyTimestamps(item, key, messages, baseRef, classes)}
+                  <div
+                    ref={(el) => (messageRefs.current[item.id] = el)}
+                    className={
+                      item.senderId === user.id
+                        ? classes.messageContainerSelf
+                        : classes.messageContainer
+                    }
+                    onDoubleClick={() => handleReply(item)}
+                    title="Clique duas vezes para responder"
+                  >
+                    {item.senderId === user.id ? (
+                      <div className={classes.messageBubbleSelf}>
+                        <div className={classes.senderInfo}>
+                          <Typography
+                            variant="subtitle2"
+                            className={classes.senderName}
+                          >
+                            {item.sender && item.sender.name
+                              ? item.sender.name
+                              : "Usuário"}{" "}
+                            - {format(new Date(item.createdAt), "HH:mm")}
+                          </Typography>
+                          <div className={classes.messageActions}>
+                            {(!item.isDeleted || user.profile === "admin") && (
+                              <>
+                                {item.senderId === user.id &&
+                                  !item.isDeleted &&
+                                  // Regra: só pode editar em até 10 minutos
+                                  new Date() - new Date(item.createdAt) <
+                                    10 * 60 * 1000 && (
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleEdit(item)}
+                                      title={i18n.t("chatMessages.edit")}
+                                    >
+                                      <EditIcon fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleDelete(item)}
+                                  title={i18n.t("chatMessages.delete")}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleForward(item)}
+                                  title={i18n.t("chatMessages.forward")}
+                                >
+                                  <ForwardIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleReply(item)}
+                                  title={i18n.t("chatMessages.reply")}
+                                >
+                                  <ReplyIcon fontSize="small" />
+                                </IconButton>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        <div className={classes.bubbleContent}>
+                          {item.isDeleted && user.profile !== "admin" ? (
+                            <Typography
+                              variant="body2"
+                              color="textSecondary"
+                              style={{ fontStyle: "italic" }}
+                            >
+                              {i18n.t("chatMessages.deleted")}
+                            </Typography>
+                          ) : item.isDeleted && user.profile === "admin" ? (
+                            <>
+                              <Typography
+                                variant="caption"
+                                style={{
+                                  color: "#888",
+                                  fontStyle: "italic",
+                                  display: "block",
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {i18n.t("chatMessages.deletedAdmin")}
+                              </Typography>
+                              {item.mediaPath && checkMessageMedia(item)}
+                              <MessageWithLineBreaks
+                                text={item.message}
+                                replyTo={repliedMessage}
+                                scrollToMessage={scrollToMessage}
+                                forwardedFrom={item.forwardedFrom}
+                                checkMessageMedia={checkMessageMedia}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              {item.mediaPath && checkMessageMedia(item)}
+                              <MessageWithLineBreaks
+                                text={item.message}
+                                replyTo={repliedMessage}
+                                scrollToMessage={scrollToMessage}
+                                forwardedFrom={item.forwardedFrom}
+                                checkMessageMedia={checkMessageMedia}
+                              />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className={classes.avatarContainer}>
+                          <Avatar
+                            src={
+                              item.sender && item.sender.profileImage
+                                ? `${process.env.REACT_APP_BACKEND_URL}/public/company${item.companyId}/user/${item.sender.profileImage}`
+                                : undefined
+                            }
+                            alt={
+                              item.sender && item.sender.name
+                                ? item.sender.name
+                                : "Usuário"
+                            }
+                          >
+                            {(!item.sender || !item.sender.profileImage) &&
+                              (item.sender && item.sender.name
+                                ? item.sender.name.charAt(0)
+                                : "?")}
+                          </Avatar>
+                        </div>
+                        <div className={classes.messageBubble}>
+                          <div className={classes.senderInfo}>
+                            <Typography
+                              variant="subtitle2"
+                              className={classes.senderName}
+                            >
+                              {item.sender && item.sender.name
+                                ? item.sender.name
+                                : "Usuário"}{" "}
+                              - {format(new Date(item.createdAt), "HH:mm")}
+                            </Typography>
+                            <div className={classes.messageActions}>
+                              {(!item.isDeleted ||
+                                user.profile === "admin") && (
+                                <>
+                                  {item.senderId === user.id &&
+                                    !item.isDeleted &&
+                                    // Regra: só pode editar em até 10 minutos
+                                    new Date() - new Date(item.createdAt) <
+                                      10 * 60 * 1000 && (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => handleEdit(item)}
+                                        title={i18n.t("chatMessages.edit")}
+                                      >
+                                        <EditIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleDelete(item)}
+                                    title={i18n.t("chatMessages.delete")}
+                                  >
+                                    <DeleteIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleForward(item)}
+                                    title={i18n.t("chatMessages.forward")}
+                                  >
+                                    <ForwardIcon fontSize="small" />
+                                  </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleReply(item)}
+                                    title={i18n.t("chatMessages.reply")}
+                                  >
+                                    <ReplyIcon fontSize="small" />
+                                  </IconButton>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className={classes.bubbleContent}>
+                            {item.isDeleted && user.profile !== "admin" ? (
+                              <Typography
+                                variant="body2"
+                                color="textSecondary"
+                                style={{ fontStyle: "italic" }}
+                              >
+                                {i18n.t("chatMessages.deleted")}
+                              </Typography>
+                            ) : item.isDeleted && user.profile === "admin" ? (
+                              <>
+                                <Typography
+                                  variant="caption"
+                                  style={{
+                                    color: "#888",
+                                    fontStyle: "italic",
+                                    display: "block",
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {i18n.t("chatMessages.deletedAdmin")}
+                                </Typography>
+                                {item.mediaPath && checkMessageMedia(item)}
+                                <MessageWithLineBreaks
+                                  text={item.message}
+                                  replyTo={repliedMessage}
+                                  scrollToMessage={scrollToMessage}
+                                  forwardedFrom={item.forwardedFrom}
+                                  checkMessageMedia={checkMessageMedia}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                {item.mediaPath && checkMessageMedia(item)}
+                                <MessageWithLineBreaks
+                                  text={item.message}
+                                  replyTo={repliedMessage}
+                                  scrollToMessage={scrollToMessage}
+                                  forwardedFrom={item.forwardedFrom}
+                                  checkMessageMedia={checkMessageMedia}
+                                />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+
+          <div ref={baseRef}></div>
         </div>
-      )}
-      
-      <div className={classes.inputArea}>
-        <FormControl variant="outlined" fullWidth>
-          <Input
-            multiline
-            disabled={isUploading}
-            value={contentMessage}
-            onKeyUp={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !isUploading) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-            onChange={(e) => setContentMessage(e.target.value)}
-            className={classes.input}
-            endAdornment={
-              <InputAdornment position="end">
-                <ChatFileUpload 
-                  disabled={isUploading}
-                  onFilesSelected={handleFilesSelected}
-                />
-                
-                <ChatAudioRecorder
-                  disabled={isUploading}
-                  onAudioRecorded={handleFilesSelected}
-                />
-                
+        {/* Input fixo */}
+        <div className={classes.inputArea} style={{ flexShrink: 0 }}>
+          {replyingTo && (
+            <div className={classes.replyContainer}>
+              <div className={classes.replyContent}>
+                <div className={classes.replySender}>
+                  {i18n.t("chatMessages.replyingTo")} {replyingTo.sender.name}
+                </div>
+                <div className={classes.replyText}>{replyingTo.message}</div>
+              </div>
+              <IconButton size="small" onClick={handleCancelReply}>
+                <CloseIcon fontSize="small" />
+              </IconButton>
+            </div>
+          )}
+          <FormControl variant="outlined" fullWidth>
+            {recording ? (
+              <div className={classes.recorderWrapper}>
                 <IconButton
-                  onClick={handleSend}
-                  disabled={isUploading || (contentMessage.trim() === "" && selectedFiles.length === 0)}
-                  className={classes.buttonSend}
+                  aria-label="cancelRecording"
+                  component="span"
+                  fontSize="large"
+                  disabled={loading}
+                  onClick={handleCancelAudio}
+                  size="large"
                 >
-                  {isUploading ? <CircularProgress size={24} /> : <SendIcon />}
+                  <HighlightOffIcon className={classes.cancelAudioIcon} />
                 </IconButton>
-              </InputAdornment>
-            }
-          />
-        </FormControl>
-      </div>
-    </Paper>
+                {loading ? (
+                  <div>
+                    <CircularProgress className={classes.audioLoading} />
+                  </div>
+                ) : (
+                  <RecordingTimer />
+                )}
+
+                <IconButton
+                  aria-label="sendRecordedAudio"
+                  component="span"
+                  onClick={handleUploadAudio}
+                  disabled={loading}
+                  size="large"
+                >
+                  <CheckCircleOutlineIcon className={classes.sendAudioIcon} />
+                </IconButton>
+              </div>
+            ) : (
+              <>
+                {medias.length > 0 ? (
+                  <>
+                    <Paper
+                      elevation={0}
+                      square
+                      className={classes.viewMediaInputWrapper}
+                    >
+                      <IconButton
+                        aria-label="cancel-upload"
+                        component="span"
+                        onClick={(e) => setMedias([])}
+                        size="large"
+                      >
+                        <CancelIcon className={classes.sendMessageIcons} />
+                      </IconButton>
+
+                      {loading ? (
+                        <div>
+                          <CircularProgress className={classes.circleLoading} />
+                        </div>
+                      ) : (
+                        <span>{medias[0]?.name}</span>
+                      )}
+                      <IconButton
+                        aria-label="send-upload"
+                        component="span"
+                        onClick={handleSendMedia}
+                        disabled={loading}
+                        size="large"
+                      >
+                        <SendIcon className={classes.sendMessageIcons} />
+                      </IconButton>
+                    </Paper>
+                  </>
+                ) : (
+                  <Fragment>
+                    <Input
+                      inputRef={inputRef}
+                      multiline
+                      value={contentMessage}
+                      onKeyUp={handleKeyPress}
+                      onChange={(e) => setContentMessage(e.target.value)}
+                      onPaste={handlePaste}
+                      className={classes.input}
+                      startAdornment={
+                        <InputAdornment position="start">
+                          <IconButton
+                            aria-label="emojiPicker"
+                            component="span"
+                            disabled={loading}
+                            onClick={(e) =>
+                              setShowEmoji((prevState) => !prevState)
+                            }
+                          >
+                            <MoodIcon className={classes.sendMessageIcons} />
+                          </IconButton>
+                          {showEmoji ? (
+                            <div className={classes.emojiBox}>
+                              <ClickAwayListener
+                                onClickAway={(e) => setShowEmoji(false)}
+                              >
+                                <Picker
+                                  perLine={16}
+                                  theme={"dark"}
+                                  showPreview={true}
+                                  showSkinTones={false}
+                                  onSelect={handleAddEmoji}
+                                />
+                              </ClickAwayListener>
+                            </div>
+                          ) : null}
+                          <FileInput
+                            disableOption={loading}
+                            handleChangeMedias={handleChangeMedias}
+                          />
+                        </InputAdornment>
+                      }
+                      endAdornment={
+                        <InputAdornment position="end">
+                          {contentMessage ? (
+                            <IconButton
+                              onClick={handleSendClick}
+                              className={classes.buttonSend}
+                              size="large"
+                            >
+                              <SendIcon />
+                            </IconButton>
+                          ) : (
+                            <IconButton
+                              aria-label="showRecorder"
+                              component="span"
+                              disabled={loading}
+                              onClick={handleStartRecording}
+                              size="large"
+                            >
+                              <MicIcon className={classes.sendMessageIcons} />
+                            </IconButton>
+                          )}
+                        </InputAdornment>
+                      }
+                    />
+                  </Fragment>
+                )}
+              </>
+            )}
+          </FormControl>
+        </div>
+      </Paper>
+
+      <DocumentModal
+        open={documentModalOpen}
+        onClose={() => setDocumentModalOpen(false)}
+        document={selectedDocument}
+      />
+    </>
   );
 }
+
+const FileInput = (props) => {
+  const { handleChangeMedias, disableOption } = props;
+  const classes = useStyles();
+  return (
+    <>
+      <input
+        multiple
+        type="file"
+        id="upload-button"
+        disabled={disableOption}
+        className={classes.uploadInput}
+        onChange={handleChangeMedias}
+      />
+      <label htmlFor="upload-button">
+        <IconButton
+          aria-label="upload"
+          component="span"
+          disabled={disableOption}
+          size="large"
+        >
+          <AttachFileIcon className={classes.sendMessageIcons} />
+        </IconButton>
+      </label>
+    </>
+  );
+};
+
+const MessageWithLineBreaks = ({
+  text,
+  replyTo,
+  scrollToMessage,
+  forwardedFrom,
+  checkMessageMedia,
+}) => {
+  const classes = useStyles();
+
+  if (!text && !replyTo && !forwardedFrom) return null;
+
+  return (
+    <div
+      style={{
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        overflowWrap: "break-word",
+        width: "100%",
+      }}
+    >
+      {forwardedFrom && (
+        <div className={classes.forwardedMessage}>
+          <div className={classes.forwardedMessageHeader}>
+            <span>{i18n.t("chatMessages.forwarded")}</span>
+          </div>
+          {forwardedFrom.mediaPath && checkMessageMedia(forwardedFrom)}
+        </div>
+      )}
+      {replyTo && (
+        <div
+          className={classes.replyPreview}
+          style={{ cursor: "pointer" }}
+          onClick={() => scrollToMessage(replyTo.id)}
+          title={i18n.t("chatMessages.clickToGoToOriginal")}
+        >
+          <div className={classes.replyPreviewSender}>
+            {replyTo.sender?.name || "Mensagem"}
+          </div>
+          <div className={classes.replyPreviewText}>
+            {replyTo.message || "[mensagem não encontrada]"}
+          </div>
+        </div>
+      )}
+      <MarkdownWrapper>{text}</MarkdownWrapper>
+    </div>
+  );
+};

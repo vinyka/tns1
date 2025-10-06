@@ -8,25 +8,52 @@ export interface ChatMessageData {
   senderId: number;
   chatId: number;
   message: string;
-  files?: any[];
+  mediaName?: string;
+  mediaPath?: string;
+  mediaType?: string;
+  companyId?: number;
+  replyToId?: number;
+  forwardedFromId?: number;
 }
 
 export default async function CreateMessageService({
   senderId,
   chatId,
   message,
-  files = []
+  mediaName,
+  mediaPath,
+  mediaType = "text",
+  companyId,
+  replyToId,
+  forwardedFromId
 }: ChatMessageData) {
   const newMessage = await ChatMessage.create({
     senderId,
     chatId,
     message,
-    files
+    mediaName,
+    mediaPath,
+    mediaType,
+    companyId,
+    replyToId,
+    forwardedFromId
   });
 
   await newMessage.reload({
     include: [
-      { model: User, as: "sender", attributes: ["id", "name"] },
+      { model: User, as: "sender", attributes: ["id", "name", "profileImage"] },
+      {
+        model: ChatMessage,
+        as: "replyTo",
+        include: [
+          {
+            model: User,
+            as: "sender",
+            attributes: ["id", "name", "profileImage"]
+          }
+        ],
+        attributes: ["id", "message"]
+      },
       {
         model: Chat,
         as: "chat",
@@ -36,9 +63,11 @@ export default async function CreateMessageService({
   });
 
   const sender = await User.findByPk(senderId);
-  const messagePreview = message || (files.length > 0 ? "[Arquivo anexado]" : "");
 
-  await newMessage.chat.update({ lastMessage: `${sender.name}: ${messagePreview}` });
+  await newMessage.chat.update({
+    lastMessage: `${sender.name}: ${mediaName != null ? mediaName : message}`,
+    updatedAt: new Date()
+  });
 
   const chatUsers = await ChatUser.findAll({
     where: { chatId }

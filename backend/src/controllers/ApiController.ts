@@ -66,16 +66,17 @@ const createContact = async (
 ) => {
   try {
     // await CheckIsValidContact(newContact, companyId);
+
     const validNumber: any = await CheckContactNumber(newContact, companyId, newContact.length > 17);
 
     const contactData = {
-      name: `${validNumber}`,
-      number: validNumber,
+      name: `${validNumber.jid.replace(/\D/g, "")}`,
+      number: validNumber.jid.split("@")[0],
       profilePicUrl: "",
       isGroup: false,
       companyId,
       whatsappId,
-      remoteJid: validNumber.length > 17 ? `${validNumber}@g.us` : `${validNumber}@s.whatsapp.net`,
+      remoteJid: validNumber.jid,
       wbot
     };
 
@@ -89,7 +90,7 @@ const createContact = async (
     let whatsapp: Whatsapp | null;
 
     if (whatsappId === undefined) {
-      whatsapp = await GetDefaultWhatsApp(whatsappId, companyId);
+      whatsapp = await GetDefaultWhatsApp(companyId);
     } else {
       whatsapp = await Whatsapp.findByPk(whatsappId);
 
@@ -157,76 +158,6 @@ function createJid(number: string) {
     ? `${number}@g.us`
     : `${formatBRNumber(number)}@s.whatsapp.net`;
 }
-
-// export const indexLink = async (req: Request, res: Response): Promise<Response> => {
-//   const newContact: ContactData = req.body;
-//   const { whatsappId }: WhatsappData = req.body;
-//   const { msdelay }: any = req.body;
-//   const url = req.body.url;
-//   const caption = req.body.caption;
-
-//   const authHeader = req.headers.authorization;
-//   const [, token] = authHeader.split(" ");
-//   const whatsapp = await Whatsapp.findOne({ where: { token } });
-//   const companyId = whatsapp.companyId;
-
-//   newContact.number = newContact.number.replace("-", "").replace(" ", "");
-
-//   const schema = Yup.object().shape({
-//     number: Yup.string()
-//       .required()
-//       .matches(/^\d+$/, "Invalid number format. Only numbers is allowed.")
-//   });
-
-//   try {
-//     await schema.validate(newContact);
-//   } catch (err: any) {
-//     throw new AppError(err.message);
-//   }
-
-//   const contactAndTicket = await createContact(whatsappId, companyId, newContact.number);
-
-//   if (!contactAndTicket) {
-//     throw new AppError("Cliente em outro atendimento")
-//   }
-//   await SendWhatsAppMessageLink({ whatsappId, contact: contactAndTicket.contact, url, caption, msdelay });
-
-//   setTimeout(async () => {
-//     const { dateToClient } = useDate();
-
-//     const hoje: string = dateToClient(new Date())
-//     const timestamp = moment().format();
-
-//     const exist = await ApiUsages.findOne({
-//       where: {
-//         dateUsed: hoje,
-//         companyId: companyId
-//       }
-//     });
-
-//     if (exist) {
-//       await exist.update({
-//         usedPDF: exist.dataValues["usedPDF"] + 1,
-//         UsedOnDay: exist.dataValues["UsedOnDay"] + 1,
-//         updatedAt: timestamp
-//       });
-//     } else {
-//       const usage = await ApiUsages.create({
-//         companyId: companyId,
-//         dateUsed: hoje,
-//       });
-
-//       await usage.update({
-//         usedPDF: usage.dataValues["usedPDF"] + 1,
-//         UsedOnDay: usage.dataValues["UsedOnDay"] + 1,
-//         updatedAt: timestamp
-//       });
-//     }
-
-//   }, 100);
-
-//   return res.send({ status: "SUCCESS" });
-// };
 
 export const index = async (req: Request, res: Response): Promise<Response> => {
   const newContact: ContactData = req.body;
@@ -342,8 +273,7 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
         throw new AppError("Error sending API media: " + error.message);
       }
     } else {
-      sentMessage = await SendWhatsAppMessageAPI({ body: `\u200e ${bodyMessage}`, whatsappId: whatsapp.id, contact: contactAndTicket.contact, quotedMsg, msdelay });
-
+      sentMessage = await SendWhatsAppMessageAPI({ body: `\u200e${bodyMessage}`, whatsappId: whatsapp.id, contact: contactAndTicket.contact, quotedMsg, msdelay });
       await verifyMessage(sentMessage, contactAndTicket, contactAndTicket.contact)
     }
     // @ts-ignore: Unreachable code error
@@ -560,7 +490,7 @@ export const checkNumber = async (req: Request, res: Response): Promise<Response
 
   const number = newContact.number.replace("-", "").replace(" ", "");
 
-  const whatsappDefault = await GetDefaultWhatsApp(whatsapp.id, companyId);
+  const whatsappDefault = await GetDefaultWhatsApp(companyId);
   const wbot = getWbot(whatsappDefault.id);
   const jid = createJid(number);
 
@@ -643,3 +573,6 @@ export const indexWhatsappsId = async (req: Request, res: Response): Promise<Res
 
   // return res.status(200).json(wpp);
 };
+
+
+

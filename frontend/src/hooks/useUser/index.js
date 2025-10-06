@@ -35,6 +35,7 @@ const useUser = () => {
     });
 
     return () => {
+      console.log("OFF USERS SOCKET")
       socket.off("users");
     };
   }, [users]);

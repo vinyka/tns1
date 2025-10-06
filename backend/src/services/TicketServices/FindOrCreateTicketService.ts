@@ -4,20 +4,13 @@ import { sub } from "date-fns";
 import Contact from "../../models/Contact";
 import Ticket from "../../models/Ticket";
 import ShowTicketService from "./ShowTicketService";
-import FindOrCreateATicketTrakingService from "./FindOrCreateATicketTrakingService";
 import { isNil } from "lodash";
 import { getIO } from "../../libs/socket";
-import logger from "../../utils/logger";
 import Whatsapp from "../../models/Whatsapp";
-import CompaniesSettings from "../../models/CompaniesSettings";
 import CreateLogTicketService from "./CreateLogTicketService";
 import AppError from "../../errors/AppError";
-import UpdateTicketService from "./UpdateTicketService";
-
-// interface Response {
-//   ticket: Ticket;
-//   // isCreated: boolean;
-// }
+import ContactWallet from "../../models/ContactWallet";
+import ShowContactService from "../ContactServices/ShowContactService";
 
 const FindOrCreateTicketService = async (
   contact: Contact,
@@ -37,6 +30,8 @@ const FindOrCreateTicketService = async (
   // try {
   // let isCreated = false;
 
+  // await new Promise(resolve => setTimeout(resolve, 3000));
+
   let openAsLGPD = false
   if (settings.enableLGPD) { //adicionar lgpdMessage
 
@@ -55,7 +50,7 @@ const FindOrCreateTicketService = async (
   let ticket = await Ticket.findOne({
     where: {
       status: {
-        [Op.or]: ["open", "pending", "group", "nps", "lgpd"]
+        [Op.or]: ["open", "pending", "group", "chatbot", "nps", "lgpd"]
       },
       contactId: groupContact ? groupContact.id : contact.id,
       companyId,
@@ -63,9 +58,6 @@ const FindOrCreateTicketService = async (
     },
     order: [["id", "DESC"]]
   });
-
-
-
 
   if (ticket) {
     if (isCampaign) {
@@ -146,20 +138,41 @@ const FindOrCreateTicketService = async (
       isBot: groupContact ? false : true,
       channel,
       imported: isImported ? new Date() : null,
-      isActiveDemand: false,
+      isActiveDemand: false
     };
 
-    if (DirectTicketsToWallets && contact.id) {
-      const wallet: any = contact;
-      const wallets = await wallet.getWallets();
-      if (wallets && wallets[0]?.id) {
-        ticketData.status = (!isImported && !isNil(settings.enableLGPD)
-          && openAsLGPD && !groupContact) ? //verifica se lgpd está habilitada e não é grupo e se tem a mensagem e link da política
-          "lgpd" :  //abre como LGPD caso habilitado parâmetro
-          (whatsapp.groupAsTicket === "enabled" || !groupContact) ? // se lgpd estiver desabilitado, verifica se é para tratar ticket como grupo ou se é contato normal
-            "open" : //caso  é para tratar grupo como ticket ou não é grupo, abre como pendente
-            "group", // se não é para tratar grupo como ticket, vai direto para grupos
-          ticketData.userId = wallets[0].id;
+    const contactWallet = await ShowContactService(contact.id, companyId)
+
+    if (DirectTicketsToWallets && ((contact.id && !groupContact) || (groupContact && groupContact)) && contactWallet.contactWallets.length > 0) {
+      const wallets = await ContactWallet.findOne({
+        where: {
+          contactId: groupContact ? groupContact.id : contact.id,
+          companyId: companyId
+        }
+      })
+
+      try {
+        if (wallets?.walletId && wallets?.queueId) {
+          const userId = contactWallet.wallets[0].id
+
+          if (wallets && wallets?.id) {
+            ticketData.status = (!isImported && !isNil(settings.enableLGPD)
+              && openAsLGPD && !groupContact) ? //verifica se lgpd está habilitada e não é grupo e se tem a mensagem e link da política
+              "lgpd" :  //abre como LGPD caso habilitado parâmetro
+              (whatsapp.groupAsTicket === "enabled" || !groupContact) ? // se lgpd estiver desabilitado, verifica se é para tratar ticket como grupo ou se é contato normal
+                "pending" : //caso é para tratar grupo como ticket ou não é grupo, abre como pendente
+                "group", // se não é para tratar grupo como ticket, vai direto para grupos
+              ticketData.userId = userId;
+            ticketData.queueId = wallets.queueId;
+            ticketData.isBot = false;
+            ticketData.startBot = false;
+            ticketData.useIntegration = false;
+            ticketData.integrationId = null;
+            ticketData.isGroup = groupContact ? true : false;
+          }
+        }
+      } catch (error) {
+        console.log("error wallet", error)
       }
     }
 

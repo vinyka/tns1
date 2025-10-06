@@ -47,6 +47,7 @@ function SchedulesForm(props) {
   ]);
 
   useEffect(() => {
+    console.log(initialValues)
     if (isArray(initialValues) && initialValues.length > 0) {
       setSchedules(initialValues);
     }
@@ -54,6 +55,7 @@ function SchedulesForm(props) {
   }, [initialValues]);
 
   const handleSubmit = (data) => {
+    console.log(data)
     onSubmit(data);
   };
 

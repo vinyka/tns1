@@ -30,6 +30,9 @@ export class FlowDefaultModel extends Model<FlowDefaultModel> {
   @Column
   flowIdNotPhrase: number;
 
+  @Column
+  flowIdInactiveTime: number;
+
   @CreatedAt
   createdAt: Date;
 

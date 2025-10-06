@@ -19,7 +19,7 @@ const socketManager = {
 				pingTimeout: 18000,
 				pingInterval: 18000,
 				query: publicToken ? { token: publicToken } : {},
-				// auth: publicToken ? { token: publicToken } : {},
+				//auth: publicToken ? { token: publicToken } : {},
 			});
 		}
 		return this.currentSocket;

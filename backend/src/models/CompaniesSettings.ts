@@ -1,132 +1,136 @@
-/** 
+/**
  * @TercioSantos-0 |
  * model/CompaniesSettings |
- * @descrição:modelo para tratar as configurações das empresas 
+ * @descrição:modelo para tratar as configurações das empresas
  */
 import {
-    Table,
-    Column,
-    CreatedAt,
-    UpdatedAt,
-    Model,
-    PrimaryKey,
-    AutoIncrement,
-    ForeignKey,
-    BelongsTo,
-    Default
-  } from "sequelize-typescript";
-  import Company from "./Company";
- 
-  
-  @Table({ tableName: "CompaniesSettings" })
-  class CompaniesSettings extends Model<CompaniesSettings> {
-    @PrimaryKey
-    @AutoIncrement
-    @Column
-    id: number;
+  Table,
+  Column,
+  CreatedAt,
+  UpdatedAt,
+  Model,
+  PrimaryKey,
+  AutoIncrement,
+  ForeignKey,
+  BelongsTo,
+  Default
+} from "sequelize-typescript";
+import Company from "./Company";
 
-    @ForeignKey(() => Company)
-    @Column
-    companyId: number;
-  
-    @BelongsTo(() => Company)
-    company: Company;
-  
-    @Column
-    hoursCloseTicketsAuto: string;
+@Table({ tableName: "CompaniesSettings" })
+class CompaniesSettings extends Model<CompaniesSettings> {
+  @PrimaryKey
+  @AutoIncrement
+  @Column
+  id: number;
 
-    @Column
-    chatBotType: string;
+  @ForeignKey(() => Company)
+  @Column
+  companyId: number;
 
-    @Column
-    acceptCallWhatsapp: string;
+  @BelongsTo(() => Company)
+  company: Company;
 
-    //inicio de opções: enabled ou disabled
-    @Column
-    userRandom: string; 
+  @Column
+  hoursCloseTicketsAuto: string;
 
-    @Column
-    sendGreetingMessageOneQueues: string; 
+  @Column
+  chatBotType: string;
 
-    @Column
-    sendSignMessage: string; 
+  @Column
+  acceptCallWhatsapp: string;
 
-    @Column
-    sendFarewellWaitingTicket: string; 
+  //inicio de opções: enabled ou disabled
+  @Column
+  userRandom: string;
 
-    @Column
-    userRating: string; 
+  @Column
+  sendGreetingMessageOneQueues: string;
 
-    @Column
-    sendGreetingAccepted: string; 
+  @Column
+  sendSignMessage: string;
 
-    @Column
-    CheckMsgIsGroup: string; 
+  @Column
+  sendFarewellWaitingTicket: string;
 
-    @Column
-    sendQueuePosition: string; 
+  @Column
+  userRating: string;
 
-    @Column
-    scheduleType: string; 
+  @Column
+  sendGreetingAccepted: string;
 
-    @Column
-    acceptAudioMessageContact: string; 
+  @Column
+  CheckMsgIsGroup: string;
 
-    // (removido) Transcrição de áudio por empresa agora é controlada apenas pelo plano
+  @Column
+  sendQueuePosition: string;
 
-    @Column
-    sendMsgTransfTicket: string;
+  @Column
+  scheduleType: string;
 
-    @Column
-    enableLGPD: string; 
+  @Column
+  acceptAudioMessageContact: string;
 
-    @Column
-    requiredTag: string; 
+  @Column
+  sendMsgTransfTicket: string;
 
-    @Column
-    lgpdDeleteMessage: string; 
+  @Column
+  enableLGPD: string;
 
-    @Column
-    lgpdHideNumber: string; 
+  @Column
+  requiredTag: string;
 
-    @Column
-    lgpdConsent: string;
+  @Column
+  lgpdDeleteMessage: string;
 
-    @Column
-    lgpdLink: string
+  @Column
+  lgpdHideNumber: string;
 
-    //fim de opções: enabled ou disabled 
-    @Column
-    lgpdMessage: string
+  @Column
+  lgpdConsent: string;
 
-    @CreatedAt
-    createdAt: Date;
-  
-    @UpdatedAt
-    updatedAt: Date;
+  @Column
+  lgpdLink: string;
 
-    @Default(false)
-    @Column
-    DirectTicketsToWallets: boolean;
+  //fim de opções: enabled ou disabled
+  @Column
+  lgpdMessage: string;
 
-    @Default(false)
-    @Column
-    closeTicketOnTransfer: boolean;
+  @CreatedAt
+  createdAt: Date;
 
-    @Column
-    transferMessage: string
+  @UpdatedAt
+  updatedAt: Date;
 
-    @Column
-    greetingAcceptedMessage: string
+  @Default(false)
+  @Column
+  DirectTicketsToWallets: boolean;
 
-    @Column
-    AcceptCallWhatsappMessage: string
+  @Default(false)
+  @Column
+  closeTicketOnTransfer: boolean;
 
-    @Column
-    sendQueuePositionMessage: string
+  @Column
+  transferMessage: string;
 
-    @Column
-    showNotificationPending: boolean;
-  }
-  
-  export default CompaniesSettings;
+  @Column
+  greetingAcceptedMessage: string;
+
+  @Column
+  AcceptCallWhatsappMessage: string;
+
+  @Column
+  sendQueuePositionMessage: string;
+
+  @Column
+  showNotificationPending: boolean;
+
+  @Default(false)
+  @Column
+  informarValorVenda: boolean;
+
+  @Column
+  motivosFinalizacao: string; // JSON string com array de motivos padrão
+}
+
+export default CompaniesSettings;

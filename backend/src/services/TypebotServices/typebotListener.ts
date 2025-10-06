@@ -143,24 +143,19 @@ const typebotListener = async ({
                     data: reqData
                 };
                 requestContinue = await axios.request(config);
-                console.log(146, "typebotListener")
-
                 messages = requestContinue.data?.messages;
                 input = requestContinue.data?.input;
                 clientSideActions = requestContinue.data?.clientSideActions;
 
             } else {
-                console.log(153, "typebotListener")
                 messages = dataStart?.messages;
                 input = dataStart?.input;
                 clientSideActions = dataStart?.clientSideActions;
             }
 
             if (messages?.length === 0) {
-                console.log(160, "typebotListener")
                 await wbot.sendMessage(`${number}@c.us`, { text: typebotUnknownMessage });
             } else {
-                console.log(163, "typebotListener")
                 for (const message of messages) {
                     if (message.type === 'text') {
                         let formattedText = '';
@@ -170,7 +165,6 @@ const typebotListener = async ({
                                 let text = '';
 
                                 if (element.text) {
-                                    console.log(173, "typebotListener")
                                     text = element.text;
                                 }
                                 if (element.type && element.children) {
@@ -178,14 +172,13 @@ const typebotListener = async ({
                                         let text = '';
 
                                         if (subelement.text) {
-                                            console.log(181, "typebotListener")
                                             text = subelement.text;
                                         }
 
                                         if (subelement.type && subelement.children) {
                                             for (const subelement2 of subelement.children) {
                                                 let text = '';
-                                                console.log(188, "typebotListener")
+
                                                 if (subelement2.text) {
                                                     text = subelement2.text;
                                                 }
@@ -327,6 +320,22 @@ const typebotListener = async ({
 
                     }
 
+                    // if (message.type === 'embed') {
+                    //     await wbot.presenceSubscribe(msg.key.remoteJid)
+                    //     //await delay(2000)
+                    //     await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
+                    //     await delay(typebotDelayMessage)
+                    //     await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                    //     const media = {
+
+                    //         document: { url: message.content.url },
+                    //         mimetype: 'application/pdf',
+                    //         caption: ""
+
+                    //     }
+                    //     await wbot.sendMessage(msg.key.remoteJid, media);
+                    // }
+
                     if (message.type === 'image') {
                         await wbot.presenceSubscribe(msg.key.remoteJid)
                         //await delay(2000)
@@ -366,25 +375,41 @@ const typebotListener = async ({
                         }
                     }
                 }
-             
-                //console.log(386, { messages, input, clientSideActions})
+
+                if (input) {
+                    if (input.type === 'choice input') {
+                        let formattedText = '';
+                        const items = input.items;
+                        let arrayOptions = [];
+
+                        for (const item of items) {
+                            formattedText += `▶️ ${item.content}\n`;
+                            arrayOptions.push(item.content);
+                        }
+                        formattedText = formattedText.replace(/\n$/, '');
+                        await wbot.presenceSubscribe(msg.key.remoteJid)
+                        //await delay(2000)
+                        await wbot.sendPresenceUpdate('composing', msg.key.remoteJid)
+                        await delay(typebotDelayMessage)
+                        await wbot.sendPresenceUpdate('paused', msg.key.remoteJid)
+                        await wbot.sendMessage(msg.key.remoteJid, { text: formattedText });
+
+                    }
+                }
             }
         }
-
-        console.log(373, "typebotListener", JSON.stringify(dataStart, null, 4))
         if (body.toLocaleLowerCase().trim() === typebotKeywordRestart.toLocaleLowerCase().trim()) {
             await ticket.update({
                 isBot: true,
                 typebotSessionId: null
 
             })
-            console.log(380, "typebotListener")
+
             await ticket.reload();
 
             await wbot.sendMessage(`${number}@c.us`, { text: typebotRestartMessage })
 
         }
-        console.log(386, "typebotListener")
         if (body.toLocaleLowerCase().trim() === typebotKeywordFinish.toLocaleLowerCase().trim()) {
             await UpdateTicketService({
                 ticketData: {
@@ -396,11 +421,9 @@ const typebotListener = async ({
                 ticketId: ticket.id,
                 companyId: ticket.companyId
             })
-            console.log(398, "typebotListener")
+
             return;
         }
-
-        console.log(402, "typebotListener")
     } catch (error) {
         logger.info("Error on typebotListener: ", error);
         await ticket.update({

@@ -5,23 +5,42 @@ import { makeStyles } from "@material-ui/core/styles";
 import { Dialog, DialogContent, Paper, Typography } from "@material-ui/core";
 import { i18n } from "../../translate/i18n";
 import api from "../../services/api";
-
 import { AuthContext } from "../../context/Auth/AuthContext";
 
 const useStyles = makeStyles((theme) => ({
-  qrWrapper: {
+  root: {
     display: "flex",
     flexWrap: "wrap",
     justifyContent: "center",
+    padding: theme.spacing(2),
   },
-  instructions: {
-    marginTop: theme.spacing(3),
-    maxWidth: 360,
+  dialogPaper: {
+    minWidth: 320,
+    maxWidth: 400,
+    width: "100%",
+    padding: theme.spacing(2),
+    margin: 0,
+    [theme.breakpoints.down("xs")]: {
+      minWidth: "90vw",
+    },
+  },
+  content: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    padding: theme.spacing(3),
+  },
+  qrCodeContainer: {
+    padding: theme.spacing(3),
+    backgroundColor: "white",
+    borderRadius: theme.shape.borderRadius,
+    marginTop: theme.spacing(2),
+  },
+  loadingText: {
+    marginTop: theme.spacing(2),
     color: theme.palette.text.secondary,
-  },
-  instructionsList: {
-    margin: theme.spacing(1, 0, 0),
-    paddingLeft: theme.spacing(3),
   },
 }));
 
@@ -47,7 +66,6 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
   useEffect(() => {
     if (!whatsAppId) return;
     const companyId = user.companyId;
-    // const socket = socketConnection({ companyId, userId: user.id });
 
     const onWhatsappData = (data) => {
       if (data.action === "update" && data.session.id === whatsAppId) {
@@ -57,38 +75,40 @@ const QrcodeModal = ({ open, onClose, whatsAppId }) => {
       if (data.action === "update" && data.session.qrcode === "") {
         onClose();
       }
-    }
+    };
     socket.on(`company-${companyId}-whatsappSession`, onWhatsappData);
 
     return () => {
       socket.off(`company-${companyId}-whatsappSession`, onWhatsappData);
     };
-  }, [whatsAppId, onClose]);
+  }, [whatsAppId, onClose, user.companyId]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" scroll="paper">
-      <DialogContent>
-        <Paper elevation={0}>
-          <Typography color="secondary" gutterBottom>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      classes={{ paper: classes.dialogPaper }}
+      aria-labelledby="qr-code-dialog"
+    >
+      <DialogContent className={classes.content}>
+        <Paper elevation={0} className={classes.dialogPaper}>
+          <Typography variant="h6" color="primary" gutterBottom>
             {i18n.t("qrCode.message")}
           </Typography>
-          <div className={classes.qrWrapper}>
+          <div className={classes.root}>
             {qrCode ? (
-              <QRCode value={qrCode} size={300} style={{ backgroundColor: "white", padding: '5px' }} />
+              <div className={classes.qrCodeContainer}>
+                <QRCode 
+                  value={qrCode} 
+                  size={280} 
+                  style={{ maxWidth: "100%", height: "auto" }}
+                />
+              </div>
             ) : (
-              <span>Aguardando pelo QR Code</span>
+              <Typography variant="body1" className={classes.loadingText}>
+                {i18n.t("qrCode.waiting")}
+              </Typography>
             )}
-          </div>
-          <div className={classes.instructions}>
-            <Typography variant="subtitle2" color="textPrimary">
-              {i18n.t("qrCode.instructions.title")}
-            </Typography>
-            <ol className={classes.instructionsList}>
-              <li>{i18n.t("qrCode.instructions.step1")}</li>
-              <li>{i18n.t("qrCode.instructions.step2")}</li>
-              <li>{i18n.t("qrCode.instructions.step3")}</li>
-              <li>{i18n.t("qrCode.instructions.step4")}</li>
-            </ol>
           </div>
         </Paper>
       </DialogContent>

@@ -7,11 +7,14 @@ import {
   PrimaryKey,
   ForeignKey,
   BelongsTo,
-  AutoIncrement
+  AutoIncrement,
+  HasMany
 } from "sequelize-typescript";
 
 import Company from "./Company";
 import User from "./User";
+import QuickMessageComponent from "./QuickMessageComponent";
+import Whatsapp from "./Whatsapp";
 
 @Table
 class QuickMessage extends Model<QuickMessage> {
@@ -30,7 +33,7 @@ class QuickMessage extends Model<QuickMessage> {
   get mediaPath(): string | null {
     if (this.getDataValue("mediaPath")) {
       
-      return `${process.env.BACKEND_URL}${process.env.PROXY_PORT ?`:${process.env.PROXY_PORT}`:""}/public/company${this.companyId}/quickMessage/${this.getDataValue("mediaPath")}`;
+      return `${process.env.BACKEND_URL}/public/company${this.companyId}/quickMessage/${this.getDataValue("mediaPath")}`;
 
     }
     return null;
@@ -38,6 +41,10 @@ class QuickMessage extends Model<QuickMessage> {
   
   @Column
   mediaName: string;
+
+  // Novo campo para tipo de mídia
+  @Column
+  mediaType: string; // 'image', 'audio', 'video', 'document'
 
   @Column
   geral: boolean;
@@ -64,6 +71,31 @@ class QuickMessage extends Model<QuickMessage> {
 
   @Column
   visao: boolean;
+
+  @Column
+  isOficial: boolean;
+
+  @Column
+  language: string;
+
+  @Column
+  status: string;
+
+  @Column
+  category: string;
+
+  @Column
+  metaID: string;
+
+  @HasMany(() => QuickMessageComponent)
+  components: QuickMessageComponent[];
+
+  @ForeignKey(() => Whatsapp)
+  @Column
+  whatsappId: number;
+
+  @BelongsTo(() => Whatsapp)
+  whatsapp: Whatsapp;
 }
 
 export default QuickMessage;

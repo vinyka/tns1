@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import { useTheme } from "@material-ui/core/styles";
 import { useHistory } from "react-router-dom";
 import {
@@ -24,6 +24,7 @@ import {
   Add as AddIcon,
   TextRotateUp,
   TextRotationDown,
+  Android as AndroidIcon,
 } from "@material-ui/icons";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
@@ -68,8 +69,6 @@ const useStyles = makeStyles((theme) => ({
     marginBottom: theme.spacing(0.5),
     marginLeft: theme.spacing(0.5),
     marginRight: theme.spacing(0.5),
-    // backgroundColor: "#eee",
-    // backgroundColor: theme.palette.tabHeaderBackground,
   },
 
   settingsIcon: {
@@ -98,6 +97,14 @@ const useStyles = makeStyles((theme) => ({
     },
 
     [theme.breakpoints.down("md")]: {
+      fontSize: "0.75rem",
+      padding: theme.spacing(0.25, 0.5),
+      marginRight: theme.spacing(0.25),
+      marginLeft: theme.spacing(0.25),
+    },
+
+    // Específico para monitores de 11-13 polegadas
+    '@media (max-width: 1366px)': {
       fontSize: "0.8rem",
       padding: theme.spacing(0.3, 0.6),
       marginRight: theme.spacing(0.3),
@@ -107,17 +114,21 @@ const useStyles = makeStyles((theme) => ({
     "&:hover": {
       backgroundColor: "rgba(0, 0, 0, 0.1)",
     },
-
-    // "&$selected": {
-    //   color: "#FFF",
-    //   backgroundColor: theme.palette.primary.main,
-    // },
   },
 
   tabPanelItem: {
     minWidth: "33%",
     fontSize: 11,
     marginLeft: 0,
+    [theme.breakpoints.down('sm')]: {
+      minWidth: "30%",
+      fontSize: 9,
+      padding: theme.spacing(0.5),
+    },
+    [theme.breakpoints.down('xs')]: {
+      minWidth: "28%",
+      fontSize: 8,
+    },
   },
 
   tabIndicator: {
@@ -140,7 +151,6 @@ const useStyles = makeStyles((theme) => ({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    // background: "#fafafa",
     background: theme.palette.optionsBackground,
     borderRadius: 8,
     borderColor: "#aaa",
@@ -155,7 +165,6 @@ const useStyles = makeStyles((theme) => ({
 
   serachInputWrapper: {
     flex: 1,
-    // background: "#fff",
     height: 40,
     background: theme.palette.total,
     display: "flex",
@@ -296,6 +305,47 @@ const useStyles = makeStyles((theme) => ({
       color: theme.mode === "light" ? theme.palette.primary.main : "#FFF",
     },
   },
+  // Classe padronizada para todos os botões de ação
+  standardButton: {
+    height: 30,
+    width: 30,
+    border: "2px solid #aaa",
+    borderRadius: 8,
+    marginRight: 8,
+    padding: 0,
+    minWidth: 'auto',
+    "&:hover": {
+      borderColor: theme.mode === "light" ? theme.palette.primary.main : "#FFF",
+    },
+    [theme.breakpoints.down('sm')]: {
+      height: 28,
+      width: 28,
+      marginRight: 6,
+    },
+    // Ajuste para monitores pequenos (11-13 polegadas)
+    '@media (max-width: 1366px)': {
+      height: 28,
+      width: 28,
+      marginRight: 6,
+    },
+  },
+  activeButton: {
+    borderColor: theme.mode === "light" ? theme.palette.primary.main : "#FFF",
+    borderWidth: "3px",
+  },
+  standardIcon: {
+    color: "#aaa",
+    fontSize: 18,
+    "&:hover": {
+      color: theme.mode === "light" ? theme.palette.primary.main : "#FFF",
+    },
+    [theme.breakpoints.down('sm')]: {
+      fontSize: 16,
+    },
+  },
+  activeIcon: {
+    color: theme.mode === "light" ? theme.palette.primary.main : "#FFF",
+  },
 }));
 
 const TicketsManagerTabs = () => {
@@ -305,7 +355,6 @@ const TicketsManagerTabs = () => {
 
   const [searchParam, setSearchParam] = useState("");
   const [tab, setTab] = useState("open");
-  // const [tabOpen, setTabOpen] = useState("open");
   const [newTicketModalOpen, setNewTicketModalOpen] = useState(false);
   const [showAllTickets, setShowAllTickets] = useState(false);
   const [sortTickets, setSortTickets] = useState(false);
@@ -349,7 +398,6 @@ const TicketsManagerTabs = () => {
     if (user.profile.toUpperCase() === "ADMIN" || user.allUserChat.toUpperCase() === "ENABLED") {
       setShowAllTickets(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -369,7 +417,6 @@ const TicketsManagerTabs = () => {
     if (searchedTerm === "") {
       setSearchParam(searchedTerm);
       setForceSearch(!forceSearch);
-      // setFilter(false);
       setTab("open");
       return;
     } else if (tab !== "search") {
@@ -384,7 +431,6 @@ const TicketsManagerTabs = () => {
   };
 
   const handleBack = () => {
-
     history.push("/tickets");
   };
 
@@ -393,10 +439,7 @@ const TicketsManagerTabs = () => {
   };
 
   const handleChangeTabOpen = (e, newValue) => {
-    // if (newValue === "pending" || newValue === "group") {
     handleBack();
-    // }
-
     setTabOpen(newValue);
   };
 
@@ -503,8 +546,19 @@ const TicketsManagerTabs = () => {
     if (filter) {
       setFilter(false);
       setTab("open");
-    } else setFilter(true);
-    setTab("search");
+      setSearchParam("");
+      setSelectedTags([]);
+      setSelectedUsers([]);
+      setSelectedWhatsapp([]);
+      setSelectedStatus([]);
+      setForceSearch(!forceSearch);
+      if (searchInputRef.current) {
+        searchInputRef.current.value = "";
+      }
+    } else {
+      setFilter(true);
+      setTab("search");
+    }
   };
 
   const [open, setOpen] = React.useState(false);
@@ -552,22 +606,6 @@ const TicketsManagerTabs = () => {
             />
           </div>
         </Tooltip>
-        {/* <IconButton
-          className={classes.filterIcon}
-          color="primary"
-          aria-label="upload picture"
-          component="span"
-          onClick={handleFilter}
-        >
-          <FilterListIcon />
-        </IconButton> */}
-        {/* <FilterListIcon
-          className={classes.filterIcon}
-          color="primary"
-          aria-label="upload picture"
-          component="span"
-          onClick={handleFilter}
-        /> */}
         <IconButton
           style={{
             backgroundColor: "transparent",
@@ -606,35 +644,6 @@ const TicketsManagerTabs = () => {
         </>
       )}
 
-      {/* <Paper elevation={0} square className={classes.tabsHeader}>
-        <Tabs
-          value={tab}
-          onChange={handleChangeTab}
-          variant="fullWidth"
-          textColor="primary"
-          aria-label="icon label tabs example"
-          classes={{ indicator: classes.tabIndicator }}
-        >
-          <Tab
-            value={"open"}
-            icon={<MoveToInboxIcon />}
-            label={i18n.t("tickets.tabs.open.title")}
-            classes={{ root: classes.tab }}
-          />
-          <Tab
-            value={"closed"}
-            icon={<CheckBoxIcon />}
-            label={i18n.t("tickets.tabs.closed.title")}
-            classes={{ root: classes.tab }}
-          />
-          <Tab
-            value={"search"}
-            icon={<SearchIcon />}
-            label={i18n.t("tickets.tabs.search.title")}
-            classes={{ root: classes.tab }}
-          />
-        </Tabs>
-      </Paper> */}
       <Paper square elevation={0} className={classes.ticketOptionsBox}>
         <Grid container alignItems="center" justifyContent="space-between">
           <Grid item>
@@ -642,35 +651,33 @@ const TicketsManagerTabs = () => {
               role={user.allUserChat === 'enabled' && user.profile === 'user' ? 'admin' : user.profile}
               perform="tickets-manager:showall"
               yes={() => (
-                <Badge
-                  color="primary"
-                  invisible={
-                    !isHoveredAll ||
-                    isHoveredNew ||
-                    isHoveredResolve ||
-                    isHoveredOpen ||
-                    isHoveredClosed
-                  }
-                  badgeContent={"Todos"}
-                  classes={{ badge: classes.tabsBadge }}
-                >
-                  <ToggleButton
-                    onMouseEnter={() => setIsHoveredAll(true)}
-                    onMouseLeave={() => setIsHoveredAll(false)}
-                    className={classes.button}
-                    value="uncheck"
-                    selected={showAllTickets}
-                    onChange={() =>
-                      setShowAllTickets((prevState) => !prevState)
-                    }
-                  >
-                    {showAllTickets ? (
-                      <VisibilityIcon className={classes.icon} />
-                    ) : (
-                      <VisibilityOffIcon className={classes.icon} />
-                    )}
-                  </ToggleButton>
-                </Badge>
+<Badge
+  color="primary"
+  invisible={
+    !isHoveredAll ||
+    isHoveredNew ||
+    isHoveredResolve ||
+    isHoveredOpen ||
+    isHoveredClosed
+  }
+  badgeContent={"Todos"}
+  classes={{ badge: classes.tabsBadge }}
+>
+  <ToggleButton
+    onMouseEnter={() => setIsHoveredAll(true)}
+    onMouseLeave={() => setIsHoveredAll(false)}
+    className={`${classes.standardButton} ${showAllTickets ? classes.activeButton : ''}`}
+    value="uncheck"
+    selected={showAllTickets}
+    onChange={() => setShowAllTickets((prevState) => !prevState)}
+  >
+    {showAllTickets ? (
+      <VisibilityIcon className={`${classes.standardIcon} ${classes.activeIcon}`} />
+    ) : (
+      <VisibilityOffIcon className={classes.standardIcon} />
+    )}
+  </ToggleButton>
+</Badge>
               )}
             />
             <Snackbar
@@ -699,213 +706,157 @@ const TicketsManagerTabs = () => {
                 </>
               }
             />
-            <Badge
-              color="primary"
-              invisible={
-                isHoveredAll ||
-                !isHoveredNew ||
-                isHoveredResolve ||
-                isHoveredOpen ||
-                isHoveredClosed
-              }
-              badgeContent={i18n.t("tickets.inbox.newTicket")}
-              classes={{ badge: classes.tabsBadge }}
-            >
-              <IconButton
-                onMouseEnter={() => setIsHoveredNew(true)}
-                onMouseLeave={() => setIsHoveredNew(false)}
-                className={classes.button}
-                onClick={() => {
-                  setNewTicketModalOpen(true);
-                }}
-              >
-                <AddIcon className={classes.icon} />
-              </IconButton>
-            </Badge>
-            {user.profile === "admin" && (
-              <Badge
-                color="primary"
-                invisible={
-                  isHoveredAll ||
-                  isHoveredNew ||
-                  !isHoveredResolve ||
-                  isHoveredOpen ||
-                  isHoveredClosed
-                }
-                badgeContent={i18n.t("tickets.inbox.closedAll")}
-                classes={{ badge: classes.tabsBadge }}
-              >
-                <IconButton
-                  onMouseEnter={() => setIsHoveredResolve(true)}
-                  onMouseLeave={() => setIsHoveredResolve(false)}
-                  className={classes.button}
-                  onClick={handleSnackbarOpen}
-                >
-                  <PlaylistAddCheckOutlined style={{ color: theme.mode === "light" ? "green" : "#FFF" }} />
-                </IconButton>
-              </Badge>
-            )}
-            <Badge
-              // color="primary"
-              invisible={
-                !(
-                  tab === "open" &&
-                  !isHoveredAll &&
-                  !isHoveredNew &&
-                  !isHoveredResolve &&
-                  !isHoveredClosed &&
-                  !isHoveredSort
-                ) && !isHoveredOpen
-              }
-              badgeContent={i18n.t("tickets.inbox.open")}
-              classes={{ badge: classes.tabsBadge }}
-            >
-              <IconButton
-                onMouseEnter={() => {
-                  setIsHoveredOpen(true);
-                  setHoveredButton("open");
-                }}
-                onMouseLeave={() => {
-                  setIsHoveredOpen(false);
-                  setHoveredButton(null);
-                }}
-                style={{
-                  height: 30,
-                  width: 30,
-                  border: isHoveredOpen
-                    ? theme.mode === "light"
-                      ? "3px solid " + theme.palette.primary.main
-                      : "3px solid #FFF"
-                    : tab === "open"
-                      ? theme.mode === "light"
-                        ? "3px solid " + theme.palette.primary.main
-                        : "3px solid #FFF"
-                      : theme.mode === "light"
-                        ? "2px solid #aaa"
-                        : "2px solid #aaa",
-                  borderRadius: 8,
-                  marginRight: 8,
-                }}
-                onClick={() => handleChangeTab(null, "open")}
-              >
-                <MoveToInboxIcon
-                  style={{
-                    color: isHoveredOpen
-                      ? theme.mode === "light"
-                        ? theme.palette.primary.main
-                        : "#FFF"
-                      : tab === "open"
-                        ? theme.mode === "light"
-                          ? theme.palette.primary.main
-                          : "#FFF"
-                        : "#aaa",
-                  }}
-                />
-              </IconButton>
-            </Badge>
+<Badge
+  color="primary"
+  invisible={
+    isHoveredAll ||
+    !isHoveredNew ||
+    isHoveredResolve ||
+    isHoveredOpen ||
+    isHoveredClosed
+  }
+  badgeContent={i18n.t("tickets.inbox.newTicket")}
+  classes={{ badge: classes.tabsBadge }}
+>
+  <IconButton
+    onMouseEnter={() => setIsHoveredNew(true)}
+    onMouseLeave={() => setIsHoveredNew(false)}
+    className={classes.standardButton}
+    onClick={() => {
+      setNewTicketModalOpen(true);
+    }}
+  >
+    <AddIcon className={classes.standardIcon} />
+  </IconButton>
+</Badge>
+{user.profile === "admin" && (
+  <Badge
+    color="primary"
+    invisible={
+      isHoveredAll ||
+      isHoveredNew ||
+      !isHoveredResolve ||
+      isHoveredOpen ||
+      isHoveredClosed
+    }
+    badgeContent={i18n.t("tickets.inbox.closedAll")}
+    classes={{ badge: classes.tabsBadge }}
+  >
+    <IconButton
+      onMouseEnter={() => setIsHoveredResolve(true)}
+      onMouseLeave={() => setIsHoveredResolve(false)}
+      className={classes.standardButton}
+      onClick={handleSnackbarOpen}
+    >
+      <PlaylistAddCheckOutlined className={classes.standardIcon} />
+    </IconButton>
+  </Badge>
+)}
+{/* Botão "Abertos" */}
+<Badge
+  invisible={
+    !(
+      tab === "open" &&
+      !isHoveredAll &&
+      !isHoveredNew &&
+      !isHoveredResolve &&
+      !isHoveredClosed &&
+      !isHoveredSort
+    ) && !isHoveredOpen
+  }
+  badgeContent={i18n.t("tickets.inbox.open")}
+  classes={{ badge: classes.tabsBadge }}
+>
+  <IconButton
+    onMouseEnter={() => {
+      setIsHoveredOpen(true);
+      setHoveredButton("open");
+    }}
+    onMouseLeave={() => {
+      setIsHoveredOpen(false);
+      setHoveredButton(null);
+    }}
+    className={`${classes.standardButton} ${
+      (tab === "open" || isHoveredOpen) ? classes.activeButton : ''
+    }`}
+    onClick={() => handleChangeTab(null, "open")}
+  >
+    <MoveToInboxIcon
+      className={`${classes.standardIcon} ${
+        (tab === "open" || isHoveredOpen) ? classes.activeIcon : ''
+      }`}
+    />
+  </IconButton>
+</Badge>
 
-            <Badge
-              color="primary"
-              invisible={
-                !(
-                  tab === "closed" &&
-                  !isHoveredAll &&
-                  !isHoveredNew &&
-                  !isHoveredResolve &&
-                  !isHoveredOpen &&
-                  !isHoveredSort
-                ) && !isHoveredClosed
-              }
-              badgeContent={i18n.t("tickets.inbox.resolverd")}
-              classes={{ badge: classes.tabsBadge }}
-            >
-              <IconButton
-                onMouseEnter={() => {
-                  setIsHoveredClosed(true);
-                  setHoveredButton("closed");
-                }}
-                onMouseLeave={() => {
-                  setIsHoveredClosed(false);
-                  setHoveredButton(null);
-                }}
-                style={{
-                  height: 30,
-                  width: 30,
-                  border: isHoveredClosed
-                    ? theme.mode === "light"
-                      ? "3px solid " + theme.palette.primary.main
-                      : "3px solid #FFF"
-                    : tab === "closed"
-                      ? theme.mode === "light"
-                        ? "3px solid " + theme.palette.primary.main
-                        : "3px solid #FFF"
-                      : theme.mode === "light"
-                        ? "2px solid #aaa"
-                        : "2px solid #aaa",
-                  borderRadius: 8,
-                  marginRight: 8,
-                }}
-                onClick={() => handleChangeTab(null, "closed")}
-              >
-                <CheckBoxIcon
-                  style={{
-                    color: isHoveredClosed
-                      ? theme.mode === "light"
-                        ? theme.palette.primary.main
-                        : "#FFF"
-                      : tab === "closed"
-                        ? theme.mode === "light"
-                          ? theme.palette.primary.main
-                          : "#FFF"
-                        : "#aaa",
-                  }}
-                />
-              </IconButton>
-            </Badge>
-            {tab !== "closed" && tab !== "search" && (
-              <Badge
-                color="primary"
-                invisible={
-                  !isHoveredSort ||
-                  isHoveredAll ||
-                  isHoveredNew ||
-                  isHoveredResolve ||
-                  isHoveredOpen ||
-                  isHoveredClosed
-                }
-                badgeContent={!sortTickets ? "Crescente" : "Decrescente"}
-                classes={{ badge: classes.tabsBadge }}
-              >
-                <ToggleButton
-                  onMouseEnter={() => setIsHoveredSort(true)}
-                  onMouseLeave={() => setIsHoveredSort(false)}
-                  className={classes.button}
-                  value="uncheck"
-                  selected={sortTickets}
-                  onChange={() =>
-                    setSortTickets((prevState) => !prevState)
-                  }
-                >
-                  {!sortTickets ? (
-                    <TextRotateUp style={{
-                      color: sortTickets
-                        ? theme.mode === "light"
-                          ? theme.palette.primary.main
-                          : "#FFF"
-                        : "#aaa",
-                    }} />
-                  ) : (
-                    <TextRotationDown style={{
-                      color: sortTickets
-                        ? theme.mode === "light"
-                          ? theme.palette.primary.main
-                          : "#FFF"
-                        : "#aaa",
-                    }} />
-                  )}
-                </ToggleButton>
-              </Badge>
-            )}
+{/* Botão "Resolvidos" */}
+<Badge
+  color="primary"
+  invisible={
+    !(
+      tab === "closed" &&
+      !isHoveredAll &&
+      !isHoveredNew &&
+      !isHoveredResolve &&
+      !isHoveredOpen &&
+      !isHoveredSort
+    ) && !isHoveredClosed
+  }
+  badgeContent={i18n.t("tickets.inbox.resolverd")}
+  classes={{ badge: classes.tabsBadge }}
+>
+  <IconButton
+    onMouseEnter={() => {
+      setIsHoveredClosed(true);
+      setHoveredButton("closed");
+    }}
+    onMouseLeave={() => {
+      setIsHoveredClosed(false);
+      setHoveredButton(null);
+    }}
+    className={`${classes.standardButton} ${
+      (tab === "closed" || isHoveredClosed) ? classes.activeButton : ''
+    }`}
+    onClick={() => handleChangeTab(null, "closed")}
+  >
+    <CheckBoxIcon
+      className={`${classes.standardIcon} ${
+        (tab === "closed" || isHoveredClosed) ? classes.activeIcon : ''
+      }`}
+    />
+  </IconButton>
+</Badge>
+
+{tab !== "closed" && tab !== "search" && (
+  <Badge
+    color="primary"
+    invisible={
+      !isHoveredSort ||
+      isHoveredAll ||
+      isHoveredNew ||
+      isHoveredResolve ||
+      isHoveredOpen ||
+      isHoveredClosed
+    }
+    badgeContent={!sortTickets ? "Crescente" : "Decrescente"}
+    classes={{ badge: classes.tabsBadge }}
+  >
+    <ToggleButton
+      onMouseEnter={() => setIsHoveredSort(true)}
+      onMouseLeave={() => setIsHoveredSort(false)}
+      className={`${classes.standardButton} ${sortTickets ? classes.activeButton : ''}`}
+      value="uncheck"
+      selected={sortTickets}
+      onChange={() => setSortTickets((prevState) => !prevState)}
+    >
+      {!sortTickets ? (
+        <TextRotateUp className={`${classes.standardIcon} ${sortTickets ? classes.activeIcon : ''}`} />
+      ) : (
+        <TextRotationDown className={`${classes.standardIcon} ${classes.activeIcon}`} />
+      )}
+    </ToggleButton>
+  </Badge>
+)}
           </Grid>
           <Grid item>
             <TicketsQueueSelect
@@ -916,6 +867,7 @@ const TicketsManagerTabs = () => {
           </Grid>
         </Grid>
       </Paper>
+
       <TabPanel value={tab} name="open" className={classes.ticketsWrapper}>
         <Tabs
           value={tabOpen}
@@ -923,6 +875,7 @@ const TicketsManagerTabs = () => {
           indicatorColor="primary"
           textColor="primary"
           variant="fullWidth"
+          scrollButtons="auto"
         >
           {/* ATENDENDO */}
           <Tab
@@ -1067,6 +1020,7 @@ const TicketsManagerTabs = () => {
           )}
         </Paper>
       </TabPanel>
+
       <TabPanel value={tab} name="closed" className={classes.ticketsWrapper}>
         <TicketsList
           status="closed"
@@ -1075,6 +1029,7 @@ const TicketsManagerTabs = () => {
           setTabOpen={setTabOpen}
         />
       </TabPanel>
+
       <TabPanel value={tab} name="search" className={classes.ticketsWrapper}>
         {profile === "admin" && (
           <>

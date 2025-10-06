@@ -20,13 +20,14 @@ export default memo(({ data, isConnectable, id }) => {
         type="target"
         position="left"
         style={{
-          background: "#FF7606",
+          background: "#9a00ed",
           width: "18px",
           height: "18px",
           top: "20px",
           left: "-12px",
           cursor: 'pointer'
         }}
+        onConnect={params => console.log("handle onConnect", params)}
         isConnectable={isConnectable}
       >
         <ArrowForwardIos
@@ -92,7 +93,7 @@ export default memo(({ data, isConnectable, id }) => {
         position="right"
         id="a"
         style={{
-          background: "#FF7606",
+          background: "#9a00ed",
           width: "18px",
           height: "18px",
           top: "70%",

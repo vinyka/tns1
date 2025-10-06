@@ -78,14 +78,15 @@ class Plan extends Model<Plan> {
   useOpenAi: boolean;
 
   @Column
-  useAudioTranscription: boolean;
-
-  @Column
   useIntegrations: boolean;
 
   @Default(true)
   @Column
   isPublic: boolean;
+
+  @Default(false)
+  @Column
+  useWhatsappOfficial: boolean;
 }
 
 export default Plan;

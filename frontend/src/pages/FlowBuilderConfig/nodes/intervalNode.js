@@ -28,13 +28,14 @@ export default memo(({ data, isConnectable, id }) => {
         type="target"
         position="left"
         style={{
-          background: "#FF7606",
+          background: "#9a00ed",
           width: "18px",
           height: "18px",
           top: "20px",
           left: "-12px",
           cursor: 'pointer'
         }}
+        onConnect={params => console.log("handle onConnect", params)}
         isConnectable={isConnectable}
       >
         <ArrowForwardIos
@@ -93,13 +94,7 @@ export default memo(({ data, isConnectable, id }) => {
         />
         <div style={{ color: "#232323", fontSize: "16px" }}>Intervalo</div>
       </div>
-      <div style={{ 
-        color: "#232323", 
-        fontSize: "12px", 
-        backgroundColor: "#F6EEEE",
-        marginBottom: "3px",
-        borderRadius: "5px"
-        }}>
+      <div style={{ color: "#232323", fontSize: "12px" }}>
         {data.sec} segundos
       </div>
       <Handle
@@ -107,7 +102,7 @@ export default memo(({ data, isConnectable, id }) => {
         position="right"
         id="a"
         style={{
-          background: "#FF7606",
+          background: "#9a00ed",
           width: "18px",
           height: "18px",
           top: "70%",

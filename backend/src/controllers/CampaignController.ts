@@ -23,6 +23,7 @@ import ContactListItem from "../models/ContactListItem";
 import AppError from "../errors/AppError";
 import { CancelService } from "../services/CampaignService/CancelService";
 import { RestartService } from "../services/CampaignService/RestartService";
+import RecurrenceService from "../services/CampaignService/RecurrenceService";
 
 type IndexQuery = {
   searchParam: string;
@@ -30,18 +31,42 @@ type IndexQuery = {
   companyId: string | number;
 };
 
+// src/controllers/CampaignController.ts - Type StoreData completo
+
 type StoreData = {
   name: string;
-  status: string;
+  message1?: string;
+  message2?: string;
+  message3?: string;
+  message4?: string;
+  message5?: string;
+  confirmationMessage1?: string;
+  confirmationMessage2?: string;
+  confirmationMessage3?: string;
+  confirmationMessage4?: string;
+  confirmationMessage5?: string;
+  status?: string;
   confirmation: boolean;
   scheduledAt: string;
   companyId: number;
-  contactListId: number;
-  tagListId: number | string;
-  userId: number | string;
-  queueId: number | string;
+  contactListId?: number | null;
+  tagListId?: number | string | null;
+  userId?: number | string | null;
+  queueId?: number | string | null;
+  whatsappId: number;
   statusTicket: string;
   openTicket: string;
+  // Novos campos de recorrência
+  isRecurring?: boolean;
+  recurrenceType?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceDaysOfWeek?: number[] | string | null; // Aceita array do frontend ou string do banco
+  recurrenceDayOfMonth?: number | null;
+  recurrenceEndDate?: string | null;
+  maxExecutions?: number | null;
+  executionCount?: number;
+  nextScheduledAt?: Date | null;
+  lastExecutedAt?: Date | null;
 };
 
 type FindParams = {
@@ -61,99 +86,337 @@ export const index = async (req: Request, res: Response): Promise<Response> => {
   return res.json({ records, count, hasMore });
 };
 
+// src/controllers/CampaignController.ts - Store method completo
+
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { companyId } = req.user;
-  const data = req.body as StoreData;
 
   const schema = Yup.object().shape({
-    name: Yup.string().required()
+    name: Yup.string().required(),
+    confirmation: Yup.boolean().required(),
+    scheduledAt: Yup.string().required(),
+    contactListId: Yup.number().nullable(),
+    tagListId: Yup.string().nullable(),
+    whatsappId: Yup.number().required(),
+    userId: Yup.number().nullable(),
+    queueId: Yup.number().nullable(),
+    statusTicket: Yup.string().required(),
+    openTicket: Yup.string().required(),
+    // Validação de recorrência
+    isRecurring: Yup.boolean().default(false),
+    recurrenceType: Yup.string().when('isRecurring', {
+      is: true,
+      then: Yup.string().oneOf(['daily', 'weekly', 'biweekly', 'monthly', 'yearly']).required(),
+      otherwise: Yup.string().nullable()
+    }),
+    recurrenceInterval: Yup.number().when('isRecurring', {
+      is: true,
+      then: Yup.number().min(1).required(),
+      otherwise: Yup.number().nullable()
+    }),
+    recurrenceDaysOfWeek: Yup.mixed().nullable(), // Mixed para aceitar array ou string
+    recurrenceDayOfMonth: Yup.number().when(['isRecurring', 'recurrenceType'], {
+      is: (isRecurring, recurrenceType) => isRecurring && recurrenceType === 'monthly',
+      then: Yup.number().min(1).max(31).required(),
+      otherwise: Yup.number().nullable()
+    }),
+    recurrenceEndDate: Yup.date().when('isRecurring', {
+      is: true,
+      then: Yup.date().min(new Date(), 'Data final deve ser futura').nullable(),
+      otherwise: Yup.date().nullable()
+    }),
+    maxExecutions: Yup.number().when('isRecurring', {
+      is: true,
+      then: Yup.number().min(1).nullable(),
+      otherwise: Yup.number().nullable()
+    })
   });
 
   try {
-    await schema.validate(data);
-  } catch (err: any) {
-    throw new AppError(err.message);
-  }
+    const {
+      name,
+      message1,
+      message2,
+      message3,
+      message4,
+      message5,
+      confirmationMessage1,
+      confirmationMessage2,
+      confirmationMessage3,
+      confirmationMessage4,
+      confirmationMessage5,
+      confirmation,
+      scheduledAt,
+      contactListId,
+      tagListId,
+      whatsappId,
+      userId,
+      queueId,
+      statusTicket,
+      openTicket,
+      // Novos campos de recorrência
+      isRecurring,
+      recurrenceType,
+      recurrenceInterval,
+      recurrenceDaysOfWeek,
+      recurrenceDayOfMonth,
+      recurrenceEndDate,
+      maxExecutions
+    }: StoreData = req.body;
 
-  if (typeof data.tagListId === 'number') {
-
-    const tagId = data.tagListId;
-    const campanhaNome = data.name;
-
-    async function createContactListFromTag(tagId) {
-
-      const currentDate = new Date();
-      const formattedDate = currentDate.toISOString();
-
-      try {
-        const contactTags = await ContactTag.findAll({ where: { tagId } });
-        const contactIds = contactTags.map((contactTag) => contactTag.contactId);
-
-        const contacts = await Contact.findAll({ where: { id: contactIds } });
-
-        const randomName = `${campanhaNome} | TAG: ${tagId} - ${formattedDate}` // Implement your own function to generate a random name
-        const contactList = await ContactList.create({ name: randomName, companyId: companyId });
-
-        const { id: contactListId } = contactList;
-
-        const contactListItems = contacts.map((contact) => ({
-          name: contact.name,
-          number: contact.number,
-          email: contact.email,
-          contactListId,
-          companyId,
-          isWhatsappValid: true,
-          isGroup: contact.isGroup
-
-        }));
-
-        await ContactListItem.bulkCreate(contactListItems);
-
-        // Return the ContactList ID
-        return contactListId;
-      } catch (error) {
-        console.error('Error creating contact list:', error);
-        throw error;
-      }
-    }
-
-
-    createContactListFromTag(tagId)
-      .then(async (contactListId) => {
-        const record = await CreateService({
-          ...data,
-          companyId,
-          contactListId: contactListId,
-        });
-        const io = getIO();
-        io.of(String(companyId))
-          .emit(`company-${companyId}-campaign`, {
-            action: "create",
-            record
-          });
-        return res.status(200).json(record);
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-        return res.status(500).json({ error: 'Error creating contact list' });
-      });
-
-  } else { // SAI DO CHECK DE TAG
-
-
-    const record = await CreateService({
-      ...data,
-      companyId
+    console.log('[Campaign Store] Dados recebidos:', {
+      isRecurring,
+      recurrenceType,
+      recurrenceDaysOfWeek,
+      recurrenceDaysOfWeekType: typeof recurrenceDaysOfWeek,
+      recurrenceDaysOfWeekIsArray: Array.isArray(recurrenceDaysOfWeek)
     });
+
+    // Processar dados de recorrência com logs
+    const processedRecurrenceData = {
+      isRecurring: isRecurring || false,
+      recurrenceType: isRecurring ? recurrenceType : null,
+      recurrenceInterval: isRecurring ? (recurrenceInterval || 1) : null,
+      recurrenceDaysOfWeek: (() => {
+        if (!isRecurring) return null;
+        if (!recurrenceDaysOfWeek) return null;
+        if (Array.isArray(recurrenceDaysOfWeek)) {
+          return recurrenceDaysOfWeek.length > 0 ? JSON.stringify(recurrenceDaysOfWeek) : null;
+        }
+        if (typeof recurrenceDaysOfWeek === 'string') {
+          return recurrenceDaysOfWeek;
+        }
+        return null;
+      })(),
+      recurrenceDayOfMonth: (isRecurring && recurrenceType === 'monthly') ? recurrenceDayOfMonth : null,
+      recurrenceEndDate: (isRecurring && recurrenceEndDate) ? new Date(recurrenceEndDate) : null,
+      maxExecutions: (isRecurring && maxExecutions) ? maxExecutions : null,
+      executionCount: 0,
+      nextScheduledAt: null,
+      lastExecutedAt: null
+    };
+
+    console.log('[Campaign Store] Dados processados:', processedRecurrenceData);
+
+    const processedData = {
+      name,
+      message1: message1 || null,
+      message2: message2 || null,
+      message3: message3 || null,
+      message4: message4 || null,
+      message5: message5 || null,
+      confirmationMessage1: confirmationMessage1 || null,
+      confirmationMessage2: confirmationMessage2 || null,
+      confirmationMessage3: confirmationMessage3 || null,
+      confirmationMessage4: confirmationMessage4 || null,
+      confirmationMessage5: confirmationMessage5 || null,
+      confirmation,
+      scheduledAt,
+      contactListId: contactListId || null,
+      tagListId: tagListId === "Nenhuma" ? null : tagListId,
+      whatsappId,
+      userId: userId || null,
+      queueId: queueId || null,
+      statusTicket,
+      openTicket,
+      companyId,
+      status: "PROGRAMADA",
+      // Adicionar campos de recorrência processados
+      ...processedRecurrenceData
+    };
+
+    await schema.validate(processedData);
+
+    const campaign = await Campaign.create(processedData);
+
+    console.log('[Campaign Store] Campanha criada:', campaign.id);
+
+    // Se for recorrente, calcular próxima execução
+    if (campaign.isRecurring) {
+      console.log('[Campaign Store] Configurando próxima execução para campanha recorrente');
+      await RecurrenceService.scheduleNextExecution(campaign.id);
+    }
 
     const io = getIO();
     io.of(String(companyId))
       .emit(`company-${companyId}-campaign`, {
         action: "create",
-        record
+        record: campaign
       });
 
-    return res.status(200).json(record);
+    return res.status(200).json(campaign);
+  } catch (err: any) {
+    console.error('[Campaign Store] Erro:', err.message);
+    throw new AppError(err.message);
+  }
+};
+
+// Update method também precisa ser atualizado
+export const update = async (req: Request, res: Response): Promise<Response> => {
+  const { companyId } = req.user;
+  const { campaignId } = req.params;
+
+  const schema = Yup.object().shape({
+    name: Yup.string().required(),
+    confirmation: Yup.boolean().required(),
+    scheduledAt: Yup.string().required(),
+    contactListId: Yup.number().nullable(),
+    tagListId: Yup.string().nullable(),
+    whatsappId: Yup.number().required(),
+    userId: Yup.number().nullable(),
+    queueId: Yup.number().nullable(),
+    statusTicket: Yup.string().required(),
+    openTicket: Yup.string().required(),
+    // Validação de recorrência
+    isRecurring: Yup.boolean().default(false),
+    recurrenceType: Yup.string().when('isRecurring', {
+      is: true,
+      then: Yup.string().oneOf(['daily', 'weekly', 'biweekly', 'monthly', 'yearly']).required(),
+      otherwise: Yup.string().nullable()
+    }),
+    recurrenceInterval: Yup.number().when('isRecurring', {
+      is: true,
+      then: Yup.number().min(1).required(),
+      otherwise: Yup.number().nullable()
+    }),
+    recurrenceDaysOfWeek: Yup.mixed().nullable(),
+    recurrenceDayOfMonth: Yup.number().when(['isRecurring', 'recurrenceType'], {
+      is: (isRecurring, recurrenceType) => isRecurring && recurrenceType === 'monthly',
+      then: Yup.number().min(1).max(31).required(),
+      otherwise: Yup.number().nullable()
+    }),
+    recurrenceEndDate: Yup.date().when('isRecurring', {
+      is: true,
+      then: Yup.date().min(new Date(), 'Data final deve ser futura').nullable(),
+      otherwise: Yup.date().nullable()
+    }),
+    maxExecutions: Yup.number().when('isRecurring', {
+      is: true,
+      then: Yup.number().min(1).nullable(),
+      otherwise: Yup.number().nullable()
+    })
+  });
+
+  try {
+    const {
+      name,
+      message1,
+      message2,
+      message3,
+      message4,
+      message5,
+      confirmationMessage1,
+      confirmationMessage2,
+      confirmationMessage3,
+      confirmationMessage4,
+      confirmationMessage5,
+      confirmation,
+      scheduledAt,
+      contactListId,
+      tagListId,
+      whatsappId,
+      userId,
+      queueId,
+      statusTicket,
+      openTicket,
+      // Novos campos de recorrência
+      isRecurring,
+      recurrenceType,
+      recurrenceInterval,
+      recurrenceDaysOfWeek,
+      recurrenceDayOfMonth,
+      recurrenceEndDate,
+      maxExecutions
+    }: StoreData = req.body;
+
+    console.log('[Campaign Update] Dados recebidos:', {
+      campaignId,
+      isRecurring,
+      recurrenceType,
+      recurrenceDaysOfWeek,
+      recurrenceDaysOfWeekType: typeof recurrenceDaysOfWeek,
+      recurrenceDaysOfWeekIsArray: Array.isArray(recurrenceDaysOfWeek)
+    });
+
+    // Processar dados de recorrência
+    const processedRecurrenceData = {
+      isRecurring: isRecurring || false,
+      recurrenceType: isRecurring ? recurrenceType : null,
+      recurrenceInterval: isRecurring ? (recurrenceInterval || 1) : null,
+      recurrenceDaysOfWeek: (() => {
+        if (!isRecurring) return null;
+        if (!recurrenceDaysOfWeek) return null;
+        if (Array.isArray(recurrenceDaysOfWeek)) {
+          return recurrenceDaysOfWeek.length > 0 ? JSON.stringify(recurrenceDaysOfWeek) : null;
+        }
+        if (typeof recurrenceDaysOfWeek === 'string') {
+          return recurrenceDaysOfWeek;
+        }
+        return null;
+      })(),
+      recurrenceDayOfMonth: (isRecurring && recurrenceType === 'monthly') ? recurrenceDayOfMonth : null,
+      recurrenceEndDate: (isRecurring && recurrenceEndDate) ? new Date(recurrenceEndDate) : null,
+      maxExecutions: (isRecurring && maxExecutions) ? maxExecutions : null
+    };
+
+    const processedData = {
+      name,
+      message1: message1 || null,
+      message2: message2 || null,
+      message3: message3 || null,
+      message4: message4 || null,
+      message5: message5 || null,
+      confirmationMessage1: confirmationMessage1 || null,
+      confirmationMessage2: confirmationMessage2 || null,
+      confirmationMessage3: confirmationMessage3 || null,
+      confirmationMessage4: confirmationMessage4 || null,
+      confirmationMessage5: confirmationMessage5 || null,
+      confirmation,
+      scheduledAt,
+      contactListId: contactListId || null,
+      tagListId: tagListId === "Nenhuma" ? null : tagListId,
+      whatsappId,
+      userId: userId || null,
+      queueId: queueId || null,
+      statusTicket,
+      openTicket,
+      companyId,
+      // Adicionar campos de recorrência processados
+      ...processedRecurrenceData
+    };
+
+    await schema.validate(processedData);
+
+    const campaign = await Campaign.findOne({
+      where: { id: campaignId, companyId },
+      attributes: { exclude: ["createdAt", "updatedAt"] }
+    });
+
+    if (!campaign) {
+      throw new AppError("ERR_NO_CAMPAIGN_FOUND", 404);
+    }
+
+    await campaign.update(processedData);
+
+    console.log('[Campaign Update] Campanha atualizada:', campaign.id);
+
+    // Se for recorrente, recalcular próxima execução
+    if (campaign.isRecurring) {
+      console.log('[Campaign Update] Reconfigurando próxima execução para campanha recorrente');
+      await RecurrenceService.scheduleNextExecution(campaign.id);
+    }
+
+    const io = getIO();
+    io.of(String(companyId))
+      .emit(`company-${companyId}-campaign`, {
+        action: "update",
+        record: campaign
+      });
+
+    return res.status(200).json(campaign);
+  } catch (err: any) {
+    console.error('[Campaign Update] Erro:', err.message);
+    throw new AppError(err.message);
   }
 };
 
@@ -161,41 +424,6 @@ export const show = async (req: Request, res: Response): Promise<Response> => {
   const { id } = req.params;
 
   const record = await ShowService(id);
-
-  return res.status(200).json(record);
-};
-
-export const update = async (
-  req: Request,
-  res: Response
-): Promise<Response> => {
-  const data = req.body as StoreData;
-
-  const { companyId } = req.user;
-
-  const schema = Yup.object().shape({
-    name: Yup.string().required()
-  });
-
-  try {
-    await schema.validate(data);
-  } catch (err: any) {
-    throw new AppError(err.message);
-  }
-
-  const { id } = req.params;
-
-  const record = await UpdateService({
-    ...data,
-    id
-  });
-
-  const io = getIO();
-  io.of(String(companyId))
-    .emit(`company-${companyId}-campaign`, {
-      action: "update",
-      record
-    });
 
   return res.status(200).json(record);
 };
@@ -289,6 +517,66 @@ export const deleteMedia = async (
     campaign.mediaName = null;
     await campaign.save();
     return res.send({ mensagem: "Arquivo excluído" });
+  } catch (err: any) {
+    throw new AppError(err.message);
+  }
+};
+
+export const previewRecurrence = async (req: Request, res: Response): Promise<Response> => {
+  const { id } = req.params;
+  const { recurrenceType, recurrenceInterval, recurrenceDaysOfWeek, recurrenceDayOfMonth } = req.query;
+
+  try {
+    const campaign = await Campaign.findByPk(id);
+    if (!campaign) {
+      throw new AppError("Campanha não encontrada", 404);
+    }
+
+    const config = {
+      type: recurrenceType as string,
+      interval: parseInt(recurrenceInterval as string),
+      daysOfWeek: recurrenceDaysOfWeek ? JSON.parse(recurrenceDaysOfWeek as string) : undefined,
+      dayOfMonth: recurrenceDayOfMonth ? parseInt(recurrenceDayOfMonth as string) : undefined
+    };
+
+    const executions = [];
+    let currentDate = new Date(campaign.scheduledAt);
+    
+    for (let i = 0; i < 10; i++) { // Preview das próximas 10 execuções
+      executions.push(new Date(currentDate));
+      currentDate = RecurrenceService.calculateNextExecution(currentDate, config);
+    }
+
+    return res.json({ executions });
+  } catch (err: any) {
+    throw new AppError(err.message);
+  }
+};
+
+export const stopRecurrence = async (req: Request, res: Response): Promise<Response> => {
+  const { id } = req.params;
+  const { companyId } = req.user;
+
+  try {
+    const campaign = await Campaign.findByPk(id);
+    if (!campaign) {
+      throw new AppError("Campanha não encontrada", 404);
+    }
+
+    await campaign.update({
+      isRecurring: false,
+      nextScheduledAt: null,
+      status: campaign.status === 'PROGRAMADA' ? 'FINALIZADA' : campaign.status
+    });
+
+    const io = getIO();
+    io.of(String(companyId))
+      .emit(`company-${companyId}-campaign`, {
+        action: "update",
+        record: campaign
+      });
+
+    return res.status(200).json({ message: "Recorrência interrompida com sucesso" });
   } catch (err: any) {
     throw new AppError(err.message);
   }

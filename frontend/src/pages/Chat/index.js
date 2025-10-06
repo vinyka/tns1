@@ -14,20 +14,33 @@ import {
   Tab,
   Tabs,
   TextField,
+  Chip,
   Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Badge,
+  Avatar,
+  IconButton,
 } from "@material-ui/core";
 import ChatList from "./ChatList";
 import ChatMessages from "./ChatMessages";
 import { UsersFilter } from "../../components/UsersFilter";
 import api from "../../services/api";
-// import { SocketContext } from "../../context/Socket/SocketContext";
-import AddIcon from "@material-ui/icons/Add";
-
+import useResponsive from "../../utils/useResponsive";
+import { socketConnection } from "../../services/socket";
 import { has, isObject } from "lodash";
+import { getBackendUrl } from "../../config";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
-import withWidth, { isWidthUp } from "@material-ui/core/withWidth";
 import { i18n } from "../../translate/i18n";
+import { toast } from "react-hot-toast";
+import ArrowBackIcon from "@material-ui/icons/ArrowBack";
+
+// FIXME checkout https://mui.com/components/use-media-query/#migrating-from-withwidth
+const withWidth = () => (WrappedComponent) => (props) =>
+  <WrappedComponent {...props} width="xs" />;
 
 const useStyles = makeStyles((theme) => ({
   mainContainer: {
@@ -38,18 +51,13 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(2),
     height: `calc(100% - 48px)`,
     overflowY: "hidden",
-    border: "none",
-    borderRadius: 10,
-    backgroundColor: theme.palette.background.default,
-    boxShadow: "0 2px 10px rgba(0, 0, 0, 0.05)",
+    border: "1px solid rgba(0, 0, 0, 0.12)",
   },
   gridContainer: {
     flex: 1,
     height: "100%",
-    border: "none",
-    borderRadius: 8,
-    background: theme.palette.background.paper,
-    overflow: "hidden",
+    border: "1px solid rgba(0, 0, 0, 0.12)",
+    background: theme.palette.background.color,
   },
   gridItem: {
     height: "100%",
@@ -60,82 +68,7 @@ const useStyles = makeStyles((theme) => ({
   },
   btnContainer: {
     textAlign: "right",
-    padding: theme.spacing(1.5),
-    borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  newButton: {
-    borderRadius: 20,
-    fontWeight: 500,
-    textTransform: "none",
-    padding: theme.spacing(0.8, 2),
-    backgroundColor: "#FF8C00",
-    color: "#fff",
-    boxShadow: "0 2px 5px rgba(255, 140, 0, 0.3)",
-    '&:hover': {
-      backgroundColor: "#E67E00",
-      boxShadow: "0 4px 8px rgba(255, 140, 0, 0.4)",
-    },
-  },
-  chatListTitle: {
-    fontWeight: 500,
-    fontSize: '1.1rem',
-    color: theme.palette.type === 'dark' ? '#f8f9fa' : theme.palette.text.primary,
-  },
-  dialogPaper: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    maxWidth: '450px',
-  },
-  dialogTitle: {
-    backgroundColor: theme.palette.type === 'dark' ? '#343a40' : '#f8f9fa',
-    color: theme.palette.type === 'dark' ? '#f8f9fa' : '#343a40',
-    borderBottom: `1px solid ${theme.palette.type === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-    padding: theme.spacing(1.5, 2),
-  },
-  dialogContent: {
-    padding: theme.spacing(2),
-    backgroundColor: theme.palette.type === 'dark' ? '#2d3238' : '#ffffff',
-  },
-  dialogActions: {
-    padding: theme.spacing(1, 2),
-    backgroundColor: theme.palette.type === 'dark' ? '#343a40' : '#f8f9fa',
-    borderTop: `1px solid ${theme.palette.type === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-  },
-  textField: {
-    '& .MuiOutlinedInput-root': {
-      borderRadius: 8,
-      '&.Mui-focused fieldset': {
-        borderColor: '#FF8C00',
-      },
-    },
-    '& .MuiInputLabel-outlined.Mui-focused': {
-      color: '#FF8C00',
-    },
-  },
-  saveButton: {
-    backgroundColor: '#FF8C00',
-    color: '#fff',
-    '&:hover': {
-      backgroundColor: '#E67E00',
-    },
-    '&.Mui-disabled': {
-      backgroundColor: theme.palette.type === 'dark' ? 'rgba(255, 140, 0, 0.3)' : 'rgba(255, 140, 0, 0.5)',
-      color: theme.palette.type === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.8)',
-    },
-    borderRadius: 20,
-    textTransform: 'none',
-    padding: theme.spacing(0.8, 2),
-  },
-  cancelButton: {
-    color: theme.palette.type === 'dark' ? '#f8f9fa' : '#343a40',
-    '&:hover': {
-      backgroundColor: theme.palette.type === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
-    },
-    borderRadius: 20,
-    textTransform: 'none',
+    padding: 10,
   },
 }));
 
@@ -145,69 +78,126 @@ export function ChatModal({
   type,
   handleClose,
   handleLoadNewChat,
-  handleUpdateChat,
+  findChats,
+  setChats,
+  setChatsPageInfo,
+  chats,
+  loggedInUserId,
 }) {
-  const classes = useStyles();
   const [users, setUsers] = useState([]);
   const [title, setTitle] = useState("");
-  const { user } = useContext(AuthContext);
+  const [description, setDescription] = useState("");
+  const [groupImage, setGroupImage] = useState("");
+  const [imageFile, setImageFile] = useState(null);
 
   useEffect(() => {
-    setTitle("");
-    setUsers([]);
-    if (type === "edit") {
-      const userList = chat.users.map((u) => ({
-        id: u.user.id,
-        name: u.user.name,
-      }));
-      setUsers(userList);
-      setTitle(chat.title);
+    if (open) {
+      setTitle("");
+      setUsers([]);
+      setDescription("");
+      setGroupImage("");
+      setImageFile(null);
+      if (type === "edit" && chat && chat.users) {
+        const userList = chat.users.map((u) => ({
+          id: u.user.id,
+          name: u.user.name,
+        }));
+        setUsers(userList);
+        setTitle(chat.title || "");
+        setDescription(chat.description || "");
+        if (chat.groupImage) {
+          setGroupImage(chat.groupImage);
+        }
+      }
     }
   }, [chat, open, type]);
 
+  // const handleImageChange = (e) => {
+  //   if (e.target.files && e.target.files[0]) {
+  //     setImageFile(e.target.files[0]);
+  //     setGroupImage(URL.createObjectURL(e.target.files[0]));
+  //   }
+  // };
+
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const previewUrl = URL.createObjectURL(file);
+      setImageFile(file);
+      setGroupImage(previewUrl);
+      console.log("Preview URL:", previewUrl);
+    }
+  };
+
   const handleSave = async () => {
     try {
-      // Adicionar estado de loading no salvamento para evitar múltiplos cliques
-      const btnSave = document.querySelector('[data-btn-save="true"]');
-      if (btnSave) btnSave.disabled = true;
-      
-      if (type === "edit") {
+      let uploadedImageUrl = groupImage;
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        const uploadRes = await api.post("/chats/upload", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        uploadedImageUrl = uploadRes.data.url;
+      }
+
+      if (type === "edit" && chat) {
         const { data } = await api.put(`/chats/${chat.id}`, {
           users,
           title,
+          description,
+          groupImage: uploadedImageUrl,
         });
-        
-        // Após editar o chat, atualizar a interface
-        if (data) {
-          handleUpdateChat(data);
-        }
+        handleLoadNewChat(data);
       } else {
+        const isCreatingGroup = users.length > 1 || title !== "";
+        console.log("isCreatingGroup:", isCreatingGroup);
+
+        if (!isCreatingGroup) {
+          const selectedUserId = users[0]?.id;
+          console.log("selectedUserId:", selectedUserId);
+          console.log("loggedInUserId:", loggedInUserId);
+          console.log("chats available:", chats);
+
+          const existingChat = chats.find((c) => {
+            const hasSelectedUser = c.users.some(
+              (u) => u.userId === selectedUserId
+            );
+            const hasLoggedInUser = c.users.some(
+              (u) => u.userId === loggedInUserId
+            );
+            const isIndividualChat = !c.isGroup && c.users.length === 2;
+
+            console.log(
+              `Checking chat ${c.id}: isIndividualChat=${isIndividualChat}, hasSelectedUser=${hasSelectedUser}, hasLoggedInUser=${hasLoggedInUser}`
+            );
+
+            return isIndividualChat && hasSelectedUser && hasLoggedInUser;
+          });
+
+          console.log("Found existingChat:", existingChat);
+
+          if (existingChat) {
+            toast.info("Chat com este usuário já existe!");
+            handleLoadNewChat(existingChat);
+            handleClose();
+            return;
+          }
+        }
+
         const { data } = await api.post("/chats", {
           users,
           title,
+          description,
+          groupImage: uploadedImageUrl,
+          isGroup: isCreatingGroup,
         });
-        
-        // Após criar o chat, notificar todos os participantes
-        if (data) {
         handleLoadNewChat(data);
-          
-          // Se o usuário não estiver na lista de participantes, adicione-o
-          if (!users.find(u => u.id === user.id)) {
-            users.push({
-              id: user.id,
-              name: user.name
-            });
-          }
-        }
       }
       handleClose();
     } catch (err) {
-      console.error("Erro ao salvar chat:", err);
-      alert("Ocorreu um erro ao salvar o chat. Tente novamente.");
-    } finally {
-      // Restaurar o botão, independente do resultado
-      const btnSave = document.querySelector('[data-btn-save="true"]');
-      if (btnSave) btnSave.disabled = false;
+      console.error(err);
+      toast.error("Erro ao criar/editar chat");
     }
   };
 
@@ -217,34 +207,79 @@ export function ChatModal({
       onClose={handleClose}
       aria-labelledby="alert-dialog-title"
       aria-describedby="alert-dialog-description"
-      maxWidth="sm"
-      fullWidth
-      classes={{ paper: classes.dialogPaper }}
     >
-      <DialogTitle 
-        id="alert-dialog-title" 
-        className={classes.dialogTitle}
-      >
-        {type === "new" ? "Nova Conversa" : "Editar Conversa"}
+      <DialogTitle id="alert-dialog-title">
+        {type === "edit"
+          ? i18n.t("chatIndex.modal.editTitle") || "Editar Grupo"
+          : i18n.t("chatIndex.modal.title") || "Criar Grupo"}
       </DialogTitle>
-      <DialogContent className={classes.dialogContent}>
-        <Grid spacing={3} container>
-          <Grid xs={12} style={{ marginTop: 8 }} item>
+      <DialogContent>
+        <Grid spacing={2} container>
+          <Grid xs={12} style={{ padding: 18, textAlign: "center" }} item>
+            <input
+              accept="image/*"
+              style={{ display: "none" }}
+              id="group-image-upload"
+              type="file"
+              onChange={handleImageChange}
+            />
+            <label htmlFor="group-image-upload">
+              <Button variant="outlined" color="primary" component="span">
+                {groupImage
+                  ? "Alterar Foto do Grupo"
+                  : "Adicionar Foto do Grupo"}
+              </Button>
+            </label>
+            {groupImage && (
+              <>
+                <div style={{ marginTop: 10 }}>
+                  <img
+                    src={
+                      typeof groupImage === "string"
+                        ? groupImage.startsWith("http") ||
+                          groupImage.startsWith("blob:")
+                          ? groupImage
+                          : `${getBackendUrl()}${groupImage}`
+                        : URL.createObjectURL(groupImage)
+                    }
+                    alt="Group"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </Grid>
+          <Grid xs={12} style={{ padding: 18 }} item>
             <TextField
-              label="Título da Conversa"
-              placeholder="Digite um título para a conversa"
+              label="Título"
+              placeholder="Título"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               variant="outlined"
               size="small"
               fullWidth
-              className={classes.textField}
             />
           </Grid>
+          <Grid xs={12} style={{ padding: 18 }} item>
+            <TextField
+              label="Descrição"
+              placeholder="Descrição do grupo"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              variant="outlined"
+              size="small"
+              fullWidth
+              multiline
+              rows={2}
+            />
+          </Grid>
+
           <Grid xs={12} item>
-            <Typography variant="subtitle1" style={{ marginBottom: 8 }}>
-              Participantes
-            </Typography>
             <UsersFilter
               onFiltered={(users) => setUsers(users)}
               initialUsers={users}
@@ -252,21 +287,23 @@ export function ChatModal({
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions className={classes.dialogActions}>
-        <Button 
-          onClick={handleClose} 
-          className={classes.cancelButton}
-        >
-          Cancelar
+      <DialogActions>
+        <Button onClick={handleClose} color="primary">
+          {i18n.t("chatIndex.modal.cancel")}
         </Button>
         <Button
           onClick={handleSave}
-          className={classes.saveButton}
+          color="primary"
           variant="contained"
-          data-btn-save="true"
-          disabled={users === undefined || users.length === 0 || title === null || title === "" || title === undefined}
+          disabled={
+            users === undefined ||
+            users.length === 0 ||
+            title === null ||
+            title === "" ||
+            title === undefined
+          }
         >
-          {type === "new" ? "Criar" : "Salvar"}
+          {i18n.t("chatIndex.modal.save")}
         </Button>
       </DialogActions>
     </Dialog>
@@ -275,7 +312,7 @@ export function ChatModal({
 
 function Chat(props) {
   const classes = useStyles();
-  const { user, socket } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const history = useHistory();
 
   const [showDialog, setShowDialog] = useState(false);
@@ -287,10 +324,37 @@ function Chat(props) {
   const [messagesPageInfo, setMessagesPageInfo] = useState({ hasMore: false });
   const [messagesPage, setMessagesPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [tab, setTab] = useState(0);
+  const [showGroupChats, setShowGroupChats] = useState(false);
   const isMounted = useRef(true);
   const scrollToBottomRef = useRef();
+  const messageListRef = useRef();
   const { id } = useParams();
+  const isMdUp = useResponsive();
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [forwardModalOpen, setForwardModalOpen] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [selectedChatForForward, setSelectedChatForForward] = useState(null);
+  const [justOpenedChat, setJustOpenedChat] = useState(false);
+
+  // Definir socket e companyId no escopo da função
+  const companyId = user?.companyId;
+  const socket = companyId
+    ? socketConnection({ companyId, userId: user?.id })
+    : null;
+
+  // Monitorar mudanças no estado chats
+  useEffect(() => {
+    const groups = chats.filter(
+      (chat) => chat.isGroup === true || chat.isGroup === "true"
+    );
+    const individualChats = chats.filter(
+      (chat) => !(chat.isGroup === true || chat.isGroup === "true")
+    );
+  }, [chats, showGroupChats]);
 
   useEffect(() => {
     return () => {
@@ -299,373 +363,491 @@ function Chat(props) {
   }, []);
 
   useEffect(() => {
-    if (isMounted.current) {
-      findChats().then((data) => {
-        const { records } = data;
-        if (records.length > 0) {
-          setChats(records);
-          setChatsPageInfo(data);
+    if (isMounted.current && user?.id) {
+      findChats()
+        .then((data) => {
+          const { records } = data;
+          console.log("Chats encontrados:", records.length);
+          if (isMounted.current && records.length > 0) {
+            setChats(records);
+            setChatsPageInfo(data);
 
-          if (id && records.length) {
-            const chat = records.find((r) => r.uuid === id);
-            selectChat(chat);
-          }
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (isObject(currentChat) && has(currentChat, "id")) {
-      findMessages(currentChat.id).then(() => {
-        if (typeof scrollToBottomRef.current === "function") {
-          setTimeout(() => {
-            scrollToBottomRef.current();
-          }, 300);
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChat]);
-
-  useEffect(() => {
-    const companyId = user.companyId;
-
-    const onChatUser = (data) => {
-      if (!data) return;
-      
-      if (data.action === "create" && data.record) {
-        // Adicionar o novo chat ao início da lista
-        setChats((prev) => [data.record, ...prev]);
-      }
-      
-      if (data.action === "update" && data.record) {
-        const changedChats = chats.map((chat) => {
-          if (chat && chat.id === data.record.id) {
-            // Atualizar também o chat atual se for o mesmo que está sendo editado
-            if (currentChat && currentChat.id === data.record.id) {
-            setCurrentChat(data.record);
-            }
-            return {
-              ...data.record,
-            };
-          }
-          return chat;
-        });
-        setChats(changedChats);
-      }
-    }
-    
-    const onChat = (data) => {
-      if (!data) return;
-      
-      if (data.action === "delete" && data.id) {
-        const filteredChats = chats.filter((c) => c && c.id !== +data.id);
-        setChats(filteredChats);
-        
-        // Verificar se o chat atual foi excluído
-        if (currentChat && currentChat.id === +data.id) {
-        setMessages([]);
-        setMessagesPage(1);
-        setMessagesPageInfo({ hasMore: false });
-        setCurrentChat({});
-          
-          // Adicionar um pequeno atraso antes do redirecionamento
-          // para garantir que os estados sejam atualizados primeiro
-          setTimeout(() => {
-        history.push("/chats");
-          }, 100);
-        }
-      }
-      
-      // Adicionar tratamento para novas mensagens em qualquer chat
-      if (data.action === "new-message" && data.chatId) {
-        // Atualizar a lista de chats com as informações atualizadas
-        updateChatWithNewMessage(data.chatId, data.newMessage, data.chat);
-      }
-      
-      // Adicionar tratamento para atualizações de status em qualquer chat
-      if (data.action === "status-update" && data.chatId) {
-        updateChatStatus(data.chatId, data.status);
-      }
-    }
-
-    const onCurrentChat = (data) => {
-      if (!data) return;
-      
-      if (data.action === "new-message" && data.newMessage) {
-        // Atualizar mensagens apenas se for o chat atual
-        if (currentChat && currentChat.id === data.newMessage.chatId) {
-        setMessages((prev) => [...prev, data.newMessage]);
-          if (typeof scrollToBottomRef.current === "function") {
-            scrollToBottomRef.current();
-          }
-        }
-        
-        // Atualizar a lista de chats com as informações do novo chat
-        updateChatWithNewMessage(data.newMessage.chatId, data.newMessage, data.chat);
-      }
-
-      if (data.action === "update" && data.chat) {
-        const changedChats = chats.map((chat) => {
-          if (chat && chat.id === data.chat.id) {
-            return {
-              ...data.chat,
-            };
-          }
-          return chat;
-        });
-        setChats(changedChats);
-        if (typeof scrollToBottomRef.current === "function") {
-        scrollToBottomRef.current();
-      }
-      }
-    }
-    
-    // Função para atualizar o chat com nova mensagem
-    const updateChatWithNewMessage = (chatId, newMessage, updatedChat) => {
-      if (!chatId || !newMessage) return;
-      
-      // Atualizar a lista de chats para mostrar a nova mensagem mesmo em chats inativos
-      setChats((prevChats) => {
-        return prevChats.map((chat) => {
-          if (chat && chat.id === chatId) {
-            // Determinar se devemos incrementar as mensagens não lidas
-            const isCurrentChat = currentChat && currentChat.id === chatId;
-            const shouldIncrementUnreads = !isCurrentChat;
-            
-            // Se estamos no chat atual, marcar como lido automaticamente
-            if (isCurrentChat) {
-              // Chamada assíncrona para marcar como lido no backend
-              if (chat.unreads > 0) {
-                markChatAsRead(chatId).catch(console.error);
+            if (id && records.length) {
+              const chat = records.find((r) => r.uuid === id);
+              if (chat) {
+                selectChat(
+                  chat,
+                  "useEffect[user?.id] (carregar chats iniciais)"
+                );
               }
             }
-            
-            // Se temos o chat atualizado do servidor, usá-lo
-            if (updatedChat) {
-              return {
-                ...updatedChat,
-                lastMessage: newMessage.message || "(Arquivo)",
-                lastMessageTime: newMessage.createdAt,
-                // Incrementar contador de não lidos apenas se não for o chat atual
-                unreads: shouldIncrementUnreads ? (chat.unreads || 0) + 1 : 0
-              };
-            } else {
-              // Caso contrário, atualizar apenas os campos necessários
-              return {
-                ...chat,
-                lastMessage: newMessage.message || "(Arquivo)",
-                lastMessageTime: newMessage.createdAt,
-                // Incrementar contador de não lidos apenas se não for o chat atual
-                unreads: shouldIncrementUnreads ? (chat.unreads || 0) + 1 : 0
-              };
+          } else {
+            console.log("Nenhum chat encontrado ou componente desmontado");
+          }
+        })
+        .catch((err) => {
+          console.error("Erro ao carregar chats iniciais:", err);
+        });
+    } else {
+      console.log("Componente não montado ou usuário não disponível");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user.id) return;
+
+    const onChatUser = (data) => {
+      if (isMounted.current) {
+        if (data.action === "create") {
+          setChats((prev) => [data.record, ...prev]);
+        }
+        if (data.action === "update") {
+          setChats((prev) =>
+            prev.map((chat) =>
+              chat.id === data.record.id ? { ...chat, ...data.record } : chat
+            )
+          );
+          if (currentChat && currentChat.id === data.record.id) {
+            setCurrentChat(data.record);
+          }
+        }
+      }
+    };
+    const onChat = (data) => {
+      if (!isMounted.current) return;
+      if (isMounted.current) {
+        if (data.action === "delete") {
+          setChats((prev) => prev.filter((c) => c.id !== +data.id));
+          setMessages([]);
+          setMessagesPage(1);
+          setMessagesPageInfo({ hasMore: false });
+          setCurrentChat({});
+          history.push("/chats");
+          setTab(0);
+        }
+        if (data.action === "new-message" || data.action === "update") {
+          // Só atualize se NÃO for o chat atualmente aberto
+          if (!currentChat || currentChat.id !== data.chat.id) {
+            setChats((prev) =>
+              prev.map((chat) =>
+                chat.id === data.chat.id ? { ...chat, ...data.chat } : chat
+              )
+            );
+          }
+        }
+      }
+    };
+
+    if (socket && companyId) {
+      socket.on(`company-${companyId}-chat-user-${user.id}`, onChatUser);
+      socket.on(`company-${companyId}-chat`, onChat);
+
+      return () => {
+        socket.off(`company-${companyId}-chat-user-${user.id}`, onChatUser);
+        socket.off(`company-${companyId}-chat`, onChat);
+      };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, socket, companyId]);
+
+  useEffect(() => {
+    if (
+      isObject(currentChat) &&
+      has(currentChat, "id") &&
+      socket &&
+      companyId
+    ) {
+      const onCurrentChat = (data) => {
+        if (isMounted.current) {
+          if (data.action === "new-message") {
+            setMessages((prev) => {
+              // Remove mensagem otimista (temp) com mesmo conteúdo e usuário
+              const filtered = prev.filter(
+                (msg) =>
+                  !(
+                    msg.id?.toString().startsWith("temp-") &&
+                    msg.senderId === data.newMessage.senderId &&
+                    msg.message === data.newMessage.message
+                  )
+              );
+              // Evita duplicidade da real
+              if (filtered.some((msg) => msg.id === data.newMessage.id)) {
+                return filtered;
+              }
+              return [...filtered, data.newMessage];
+            });
+            const changedChats = chats.map((chat) => {
+              if (chat.id === data.newMessage.chatId) {
+                return {
+                  ...chat,
+                  ...data.chat,
+                  lastMessage: data.newMessage,
+                  updatedAt: data.newMessage.createdAt,
+                };
+              }
+              return chat;
+            });
+            setChats(changedChats);
+            if (typeof scrollToBottomRef.current === "function") {
+              setTimeout(() => {
+                scrollToBottomRef.current();
+              }, 300);
+            }
+            // NÃO altere setMessagesPage aqui!
+          } else if (data.action === "edit-message") {
+            setMessages((prevMessages) =>
+              prevMessages.map((msg) =>
+                msg.id === data.message.id ? data.message : msg
+              )
+            );
+          } else if (data.action === "delete-message") {
+            setMessages((prevMessages) =>
+              prevMessages.map((msg) =>
+                msg.id === data.message.id ? data.message : msg
+              )
+            );
+          }
+
+          if (data.action === "update") {
+            const changedChats = chats.map((chat) => {
+              if (chat.id === data.chat.id) {
+                return {
+                  ...chat,
+                  ...data.chat,
+                };
+              }
+              return chat;
+            });
+            setChats(changedChats);
+            if (typeof scrollToBottomRef.current === "function") {
+              scrollToBottomRef.current();
             }
           }
-          return chat;
-        });
-      });
-    };
-    
-    // Função para atualizar status de um chat
-    const updateChatStatus = (chatId, status) => {
-      if (!chatId) return;
-      
-      setChats((prevChats) => {
-        return prevChats.map((chat) => {
-          if (chat && chat.id === chatId) {
-            return {
-              ...chat,
-              status: status
-            };
-          }
-          return chat;
-        });
-      });
-    };
+        }
+      };
 
-    // Configurar ouvintes de socket
-    socket.on(`company-${companyId}-chat-user-${user.id}`, onChatUser);
-    socket.on(`company-${companyId}-chat`, onChat);
-    
-    // Ouvinte específico para o chat atual
-    if (isObject(currentChat) && has(currentChat, "id")) {
       socket.on(`company-${companyId}-chat-${currentChat.id}`, onCurrentChat);
+
+      return () => {
+        socket.off(
+          `company-${companyId}-chat-${currentChat.id}`,
+          onCurrentChat
+        );
+      };
     }
-    
-    // Adicionar ouvintes para todos os chats para receber atualizações em tempo real
-    chats.forEach(chat => {
-      if (chat.id !== currentChat.id) {
-        socket.on(`company-${companyId}-chat-${chat.id}`, (data) => {
-          // Precisamos tratar apenas atualizações de status e novas mensagens
-          if (data.action === "new-message") {
-            updateChatWithNewMessage(chat.id, data.newMessage, data.chat);
-          }
-          if (data.action === "update") {
-            updateChatStatus(chat.id, data.status);
-          }
-        });
-      }
-    });
+  }, [currentChat, chats, companyId, socket]);
 
-    return () => {
-      // Remover todos os ouvintes
-      socket.off(`company-${companyId}-chat-user-${user.id}`, onChatUser);
-      socket.off(`company-${companyId}-chat`, onChat);
-      
-      if (isObject(currentChat) && has(currentChat, "id")) {
-        socket.off(`company-${companyId}-chat-${currentChat.id}`, onCurrentChat);
-      }
-      
-      // Remover ouvintes de todos os chats
-      chats.forEach(chat => {
-        if (chat.id !== currentChat.id) {
-          socket.off(`company-${companyId}-chat-${chat.id}`);
-        }
-      });
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentChat, chats]);
+  // Modifique selectChat para buscar apenas a primeira página ao abrir o chat
+  const selectChat = async (chat, reason = "manual") => {
+    console.log(`[selectChat] Motivo: ${reason}`, chat);
+    if (!isMounted.current) return;
+    setMessages([]);
+    setMessagesPage(1);
+    setMessagesPageInfo(null);
+    setJustOpenedChat(true);
 
-  const selectChat = (chat) => {
     try {
-      if (!chat || !chat.id) {
-        console.error('Chat indefinido ou sem ID');
-        return;
-      }
-      
-      setMessages([]);
-      setMessagesPage(1);
+      // Buscar chat atualizado do backend usando UUID
+      const { data } = await api.get(`/chats/${chat.uuid}`);
+      if (!isMounted.current) return;
+      setCurrentChat(data);
+
+      // Buscar apenas a primeira página de mensagens
+      await findMessages(data.id, false, 1); // Passa página 1 explicitamente
+    } catch (err) {
+      if (!isMounted.current) return;
       setCurrentChat(chat);
-      setTab(1);
-      
-      // Marcar mensagens como lidas explicitamente quando selecionar um chat
-      markChatAsRead(chat.id);
-        
-      // Atualizar contagem de mensagens não lidas localmente
-      const updatedChats = chats.map(c => {
-        if (c && c.id === chat.id) {
-          return { ...c, unreads: 0 };
-        }
-        return c;
-      });
-      setChats(updatedChats);
-    } catch (err) {
-      console.error('Erro ao selecionar chat:', err);
+      await findMessages(chat.id, false, 1);
     }
   };
 
-  // Função para marcar chat como lido
-  const markChatAsRead = async (chatId) => {
-    try {
-      await api.post(`/chats/${chatId}/read`, { userId: user.id });
-    } catch (err) {
-      console.error('Erro ao marcar chat como lido:', err);
-    }
-  };
-
+  // No sendMessage, garanta que NENHUM findMessages, selectChat ou loadMoreMessages é chamado após o envio.
   const sendMessage = async (contentMessage) => {
+    if (!currentChat || !currentChat.id) {
+      console.error("Nenhum chat selecionado para enviar mensagem");
+      return;
+    }
     setLoading(true);
     try {
       await api.post(`/chats/${currentChat.id}/messages`, {
         message: contentMessage,
       });
-    } catch (err) { }
+      // Não chame findMessages, selectChat ou loadMoreMessages aqui!
+      // Apenas limpe o campo de input, a mensagem será adicionada pelo socket
+    } catch (err) {
+      console.error("Erro ao enviar mensagem:", err);
+    }
     setLoading(false);
   };
 
   const deleteChat = async (chat) => {
     try {
       await api.delete(`/chats/${chat.id}`);
-      // O socket se encarregará de atualizar a interface após a exclusão
-    } catch (err) {
-      console.error("Erro ao excluir chat:", err);
-      alert("Não foi possível excluir o chat. Tente novamente.");
-    }
+    } catch (err) {}
   };
 
-  const updateChat = (updatedChat) => {
-    // Atualizar o chat localmente
-    const updatedChats = chats.map(chat => {
-      if (chat.id === updatedChat.id) {
-        return updatedChat;
-      }
-      return chat;
-    });
-    
-    setChats(updatedChats);
-    
-    // Se o chat atualmente selecionado for o mesmo que está sendo editado, atualizá-lo
-    if (currentChat.id === updatedChat.id) {
-      setCurrentChat(updatedChat);
-    }
-  };
+  // Modifique findMessages para aceitar página explicitamente
+  const findMessages = async (chatId, isLoadMore = false, page = null) => {
+    if (!isMounted.current || !chatId) return;
 
-  const findMessages = async (chatId) => {
-    setLoading(true);
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    let currentScrollHeight = 0;
+    let currentScrollTop = 0;
+    if (isLoadMore) {
+      const messageListElement = document.querySelector(".messageList");
+      currentScrollHeight = messageListElement?.scrollHeight || 0;
+      currentScrollTop = messageListElement?.scrollTop || 0;
+    }
+
     try {
-      const { data } = await api.get(
-        `/chats/${chatId}/messages?pageNumber=${messagesPage}`
-      );
-      setMessagesPage((prev) => prev + 1);
-      setMessagesPageInfo(data);
-      setMessages((prev) => [...data.records, ...prev]);
-    } catch (err) { }
-    setLoading(false);
+      const pageToFetch = page !== null ? page : messagesPage;
+      const url = `/chats/${chatId}/messages?pageNumber=${pageToFetch}`;
+      const { data } = await api.get(url);
+      if (!isMounted.current) return;
+
+      if (isMounted.current) {
+        const isFirstPage = pageToFetch === 1;
+        if (isLoadMore) {
+          setMessagesPage((prev) => prev + 1);
+        }
+        setMessagesPageInfo(data);
+        if (isFirstPage) {
+          setMessages(data.records);
+        } else {
+          setMessages((prev) => [...data.records, ...prev]);
+          if (isLoadMore) {
+            setTimeout(() => {
+              if (!isMounted.current) return;
+              const messageListElement = document.querySelector(".messageList");
+              if (messageListElement) {
+                const newScrollHeight = messageListElement.scrollHeight;
+                const scrollDifference = newScrollHeight - currentScrollHeight;
+                messageListElement.scrollTop =
+                  currentScrollTop + scrollDifference;
+              }
+            }, 100);
+          }
+        }
+      }
+    } catch (err) {
+      if (!isMounted.current) return;
+      console.error("Erro ao carregar mensagens:", err);
+    } finally {
+      if (isMounted.current) {
+        if (isLoadMore) {
+          setLoadingMore(false);
+        } else {
+          setLoading(false);
+        }
+      }
+    }
   };
 
   const loadMoreMessages = async () => {
-    if (!loading) {
-      findMessages(currentChat.id);
+    if (
+      !loadingMore &&
+      currentChat &&
+      currentChat.id &&
+      messagesPageInfo?.hasMore
+    ) {
+      await findMessages(currentChat.id, true); // Não passe page aqui!
     }
   };
 
-  // Adicionar função para atualizar mensagens em tempo real
-  const handleMessagesUpdate = (updatedMessages) => {
-    setMessages(updatedMessages);
-  };
-
   const findChats = async () => {
+    if (!isMounted.current) return;
+    setLoading(true);
     try {
-      const { data } = await api.get("/chats");
+      const { data } = await api.get(`/chats`);
+
+      // Contar grupos e chats individuais
+      const groups = data.records.filter(
+        (chat) => chat.isGroup === true || chat.isGroup === "true"
+      );
+      const individualChats = data.records.filter(
+        (chat) => !(chat.isGroup === true || chat.isGroup === "true")
+      );
+
+      if (isMounted.current) {
+        setChats(data.records);
+        setChatsPageInfo(data);
+        console.log("Chats definidos no estado");
+      }
       return data;
     } catch (err) {
-      console.log(err);
+      console.log("Erro ao carregar chats:", err);
+      return { records: [], hasMore: false };
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleLoadNewChat = (data) => {
+    if (!isMounted.current) return;
+
+    // Limpar estado anterior
+    setMessages([]);
+    setMessagesPage(1);
+    setMessagesPageInfo(null);
+    setCurrentChat(data);
+    setJustOpenedChat(true); // Ativar scroll automático
+
+    // No mobile, não mudar a tab automaticamente
+    // Deixar o usuário escolher qual tab usar
+
+    history.push(`/chats/${data.uuid}`);
+
+    // Não chame findMessages aqui, selectChat já faz isso
+    selectChat(data, "handleLoadNewChat (novo chat criado/editado)");
+    // Atualiza a lista de chats
+    findChats().then((chatsData) => {
+      if (isMounted.current && chatsData && chatsData.records) {
+        setChats(chatsData.records);
+        setChatsPageInfo(chatsData);
+      }
+    });
+  };
+
+  const handleEditMessage = (message) => {
+    // Regra: só pode editar em até 10 minutos
+    if (new Date() - new Date(message.createdAt) > 10 * 60 * 1000) {
+      alert("Só é possível editar mensagens enviadas há menos de 10 minutos.");
+      return;
+    }
+    setSelectedMessage(message);
+    setEditText(message.message);
+    setEditModalOpen(true);
+  };
+
+  const handleDeleteMessage = (message) => {
+    setSelectedMessage(message);
+    setDeleteModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    try {
+      const { data } = await api.put(`/chats/messages/${selectedMessage.id}`, {
+        message: editText,
+      });
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === selectedMessage.id ? { ...msg, message: editText } : msg
+        )
+      );
+      setEditModalOpen(false);
+      setSelectedMessage(null);
+      setEditText("");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteSubmit = async () => {
+    try {
+      await api.delete(`/chats/messages/${selectedMessage.id}`);
+      setMessages((prevMessages) =>
+        prevMessages.map((msg) =>
+          msg.id === selectedMessage.id
+            ? {
+                ...msg,
+                isDeleted: true,
+                message: "Esta mensagem foi apagada",
+                mediaPath: null,
+                forwardedFrom: null,
+                replyTo: null,
+              }
+            : msg
+        )
+      );
+      setDeleteModalOpen(false);
+      setSelectedMessage(null);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleForwardMessage = (message) => {
+    setSelectedMessage(message);
+    setForwardModalOpen(true);
+  };
+
+  const handleForwardSubmit = async () => {
+    try {
+      await api.post(`/chats/messages/${selectedMessage.id}/forward`, {
+        targetChatId: selectedChatForForward,
+      });
+      setForwardModalOpen(false);
+      setSelectedMessage(null);
+      setSelectedChatForForward(null);
+    } catch (err) {
+      console.error(err);
     }
   };
 
   const renderGrid = () => {
+    const filteredChats = chats
+      .filter((chat) => {
+        const isGroup = chat.isGroup === true || chat.isGroup === "true";
+        const shouldShow = showGroupChats ? isGroup : !isGroup;
+
+        return shouldShow;
+      })
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
     return (
       <Grid className={classes.gridContainer} container>
         <Grid className={classes.gridItem} md={3} item>
-          <div className={classes.btnContainer}>
-            <Typography className={classes.chatListTitle}>
-              Conversas
-            </Typography>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <Button
+              onClick={() => setShowGroupChats(false)}
+              color={!showGroupChats ? "primary" : "default"}
+              variant={!showGroupChats ? "contained" : "outlined"}
+              fullWidth
+            >
+              {i18n.t("chatIndex.chats")}
+            </Button>
+            <Button
+              onClick={() => setShowGroupChats(true)}
+              color={showGroupChats ? "primary" : "default"}
+              variant={showGroupChats ? "contained" : "outlined"}
+              fullWidth
+            >
+              {i18n.t("chatIndex.groups")}
+            </Button>
             <Button
               onClick={() => {
                 setDialogType("new");
                 setShowDialog(true);
               }}
-              className={classes.newButton}
+              color="secondary"
               variant="contained"
-              startIcon={<AddIcon style={{ fontSize: 18 }} />}
+              fullWidth
             >
-              Nova
+              {i18n.t("chatIndex.createGroup")}
             </Button>
           </div>
           <ChatList
-            chats={chats}
+            chats={filteredChats}
             pageInfo={chatsPageInfo}
             loading={loading}
-            handleSelectChat={(chat) => selectChat(chat)}
+            handleSelectChat={(chat) =>
+              selectChat(chat, "seleção manual na lista")
+            }
             handleDeleteChat={(chat) => deleteChat(chat)}
             handleEditChat={(chat) => {
               setCurrentChat(chat);
               setDialogType("edit");
               setShowDialog(true);
             }}
+            findChats={findChats}
           />
         </Grid>
         <Grid className={classes.gridItem} md={9} item>
@@ -676,9 +858,16 @@ function Chat(props) {
               pageInfo={messagesPageInfo}
               messages={messages}
               loading={loading}
+              loadingMore={loadingMore}
               handleSendMessage={sendMessage}
               handleLoadMore={loadMoreMessages}
-              onMessagesUpdate={handleMessagesUpdate}
+              onEdit={handleEditMessage}
+              onDelete={handleDeleteMessage}
+              onForward={handleForwardMessage}
+              justOpenedChat={justOpenedChat}
+              setJustOpenedChat={setJustOpenedChat}
+              messageListRef={messageListRef}
+              addOptimisticMessage={addOptimisticMessage}
             />
           )}
         </Grid>
@@ -689,68 +878,214 @@ function Chat(props) {
   const renderTab = () => {
     return (
       <Grid className={classes.gridContainer} container>
-        <Grid md={12} item>
-          <Tabs
-            value={tab}
-            indicatorColor="primary"
-            textColor="primary"
-            onChange={(e, v) => setTab(v)}
-            aria-label="disabled tabs example"
-          >
-            <Tab label="Chats" />
-            <Tab label="Mensagens" />
-          </Tabs>
-        </Grid>
-        {tab === 0 && (
-          <Grid className={classes.gridItemTab} md={12} item>
-            <div className={classes.btnContainer}>
-              <Typography className={classes.chatListTitle}>
-                Conversas
-              </Typography>
+        {!currentChat.id ? (
+          <Grid item xs={12}>
+            {/* Cabeçalho da lista com botão Criar grupo */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                padding: "16px 16px 0 16px",
+                background: "#fff",
+                borderBottom: "1px solid #eee",
+                position: "sticky",
+                top: 0,
+                zIndex: 100,
+              }}
+            >
               <Button
-                onClick={() => {
-                  setDialogType("new");
-                  setShowDialog(true);
-                }}
-                className={classes.newButton}
+                onClick={() => setShowDialog(true)}
+                color="primary"
                 variant="contained"
-                startIcon={<AddIcon style={{ fontSize: 18 }} />}
+                style={{ minWidth: 120 }}
               >
-                Nova
+                {i18n.t("chatIndex.createGroup") || "Criar grupo"}
               </Button>
             </div>
-            <ChatList
-              chats={chats}
-              pageInfo={chatsPageInfo}
-              loading={loading}
-              handleSelectChat={(chat) => selectChat(chat)}
-              handleDeleteChat={(chat) => deleteChat(chat)}
-              handleEditChat={(chat) => {
-                setCurrentChat(chat);
-                setDialogType("edit");
-                setShowDialog(true);
+            {/* Abas de Chats e Grupos */}
+            <div
+              style={{
+                background: "#fff",
+                position: "sticky",
+                top: 56,
+                zIndex: 99,
               }}
-            />
+            >
+              <Tabs
+                value={tab}
+                onChange={(e, v) => setTab(v)}
+                indicatorColor="primary"
+                textColor="primary"
+                variant="fullWidth"
+              >
+                <Tab label={i18n.t("chatIndex.chats") || "Chats"} />
+                <Tab label={i18n.t("chatIndex.groups") || "Grupos"} />
+              </Tabs>
+            </div>
+            {tab === 0 && (
+              <Grid className={classes.gridItemTab} md={12} item>
+                <ChatList
+                  chats={chats.filter((chat) => {
+                    const isGroup =
+                      chat.isGroup === true || chat.isGroup === "true";
+                    return !isGroup;
+                  })}
+                  pageInfo={chatsPageInfo}
+                  loading={loading}
+                  handleSelectChat={(chat) => selectChat(chat)}
+                  handleDeleteChat={(chat) => deleteChat(chat)}
+                  findChats={findChats}
+                />
+              </Grid>
+            )}
+            {tab === 1 && (
+              <Grid className={classes.gridItemTab} md={12} item>
+                <ChatList
+                  chats={chats.filter((chat) => {
+                    const isGroup =
+                      chat.isGroup === true || chat.isGroup === "true";
+                    return isGroup;
+                  })}
+                  pageInfo={chatsPageInfo}
+                  loading={loading}
+                  handleSelectChat={(chat) => selectChat(chat)}
+                  handleDeleteChat={(chat) => deleteChat(chat)}
+                  handleEditChat={(chat) => {
+                    setCurrentChat(chat);
+                    setDialogType("edit");
+                    setShowDialog(true);
+                  }}
+                  findChats={findChats}
+                />
+              </Grid>
+            )}
           </Grid>
-        )}
-        {tab === 1 && (
-          <Grid className={classes.gridItemTab} md={12} item>
-            {isObject(currentChat) && has(currentChat, "id") && (
+        ) : (
+          <Grid
+            className={classes.gridItemTab}
+            md={12}
+            item
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              minHeight: 0,
+              padding: 0,
+            }}
+          >
+            {/* Cabeçalho mobile da conversa */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                padding: "10px",
+                borderBottom: "1px solid #eee",
+                background: "#fff",
+                position: "sticky",
+                top: 0,
+                zIndex: 100,
+              }}
+            >
+              <IconButton onClick={() => setCurrentChat({})}>
+                <ArrowBackIcon />
+              </IconButton>
+              {/* <Avatar
+                src={
+                  currentChat.isGroup
+                    ? currentChat.groupImage
+                      ? currentChat.groupImage.startsWith("http")
+                        ? currentChat.groupImage
+                        : `${getBackendUrl()}${currentChat.groupImage}`
+                      : undefined
+                    : currentChat.users &&
+                      currentChat.users.find((u) => u.userId !== user.id)?.user
+                        ?.profileImage
+                    ? currentChat.users
+                        .find((u) => u.userId !== user.id)
+                        .user.profileImage.startsWith("http")
+                      ? currentChat.users.find((u) => u.userId !== user.id).user
+                          .profileImage
+                      : `${getBackendUrl()}/public/company${
+                          currentChat.users.find((u) => u.userId !== user.id)
+                            .user.companyId
+                        }/user/${
+                          currentChat.users.find((u) => u.userId !== user.id)
+                            .user.profileImage
+                        }`
+                    : undefined
+                }
+                style={{ marginRight: 12 }}
+              >
+                {currentChat.isGroup
+                  ? currentChat.title?.charAt(0) || "G"
+                  : (currentChat.users &&
+                      currentChat.users
+                        .find((u) => u.userId !== user.id)
+                        ?.user?.name?.charAt(0)) ||
+                    "?"}
+              </Avatar> */}
+
+              {/* Nome do usuário ou grupo */}
+              {/* <Typography variant="subtitle1" style={{ fontWeight: 600 }}>
+                {currentChat.isGroup
+                  ? currentChat.title || "Grupo"
+                  : (currentChat.users &&
+                      currentChat.users.find((u) => u.userId !== user.id)?.user
+                        ?.name) ||
+                    "Usuário"}
+              </Typography> */}
+            </div>
+            {/* Container flexível para ChatMessages */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               <ChatMessages
+                chat={currentChat}
                 scrollToBottomRef={scrollToBottomRef}
                 pageInfo={messagesPageInfo}
                 messages={messages}
                 loading={loading}
+                loadingMore={loadingMore}
                 handleSendMessage={sendMessage}
                 handleLoadMore={loadMoreMessages}
-                onMessagesUpdate={handleMessagesUpdate}
-                chat={currentChat}
+                onEdit={handleEditMessage}
+                onDelete={handleDeleteMessage}
+                onForward={handleForwardMessage}
+                // messageListRef={messageListRef}
+                // isFirstPage={messagesPage === 2}
+                justOpenedChat={justOpenedChat}
+                setJustOpenedChat={setJustOpenedChat}
+                addOptimisticMessage={addOptimisticMessage}
               />
-            )}
+            </div>
           </Grid>
         )}
       </Grid>
     );
+  };
+
+  useEffect(() => {
+    if (id && chats.length) {
+      const chat = chats.find((r) => r.uuid === id);
+      // Só chama selectChat se o chat atual for diferente
+      if (chat && (!currentChat || currentChat.id !== chat.id)) {
+        selectChat(
+          chat,
+          "useEffect[id, chats] (mudança de rota ou lista de chats)"
+        );
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, chats]);
+
+  const addOptimisticMessage = (msg) => {
+    setMessages((prev) => [...prev, msg]);
   };
 
   return (
@@ -759,27 +1094,108 @@ function Chat(props) {
         type={dialogType}
         open={showDialog}
         chat={currentChat}
-        handleLoadNewChat={(data) => {
-          // Quando um novo chat é criado, atualize-o localmente e também adicione-o à lista de chats
-          setMessages([]);
-          setMessagesPage(1);
-          setCurrentChat(data);
-          setTab(1);
-          
-          // Adicionar o novo chat ao início da lista
-          setChats((prev) => [data, ...prev]);
-          
-          history.push(`/chats/${data.uuid}`);
-        }}
-        handleUpdateChat={(data) => {
-          // Quando um chat é editado, atualize-o localmente
-          updateChat(data);
-        }}
+        handleLoadNewChat={handleLoadNewChat}
         handleClose={() => setShowDialog(false)}
+        findChats={findChats}
+        setChats={setChats}
+        setChatsPageInfo={setChatsPageInfo}
+        chats={chats}
+        loggedInUserId={user.id}
       />
-      <Paper className={classes.mainContainer}>
-        {isWidthUp("md", props.width) ? renderGrid() : renderTab()}
+      <Paper
+        className={classes.mainContainer}
+        // style={{
+        //   height: "100%",
+        //   minHeight: 0,
+        //   display: "flex",
+        //   flexDirection: "column",
+        //   padding: 0,
+        // }}
+      >
+        {isMdUp ? renderGrid() : renderTab()}
       </Paper>
+      <Dialog
+        open={editModalOpen}
+        onClose={() => setEditModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Editar Mensagem</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Mensagem"
+            type="text"
+            fullWidth
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            multiline
+            minRows={3}
+            maxRows={10}
+            inputProps={{ style: { fontSize: 18 } }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditModalOpen(false)} color="secondary">
+            {i18n.t("chatIndex.cancel")}
+          </Button>
+          <Button onClick={handleEditSubmit} color="primary">
+            {i18n.t("chatIndex.save")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
+        <DialogTitle>{i18n.t("chatIndex.deleteGroup")}</DialogTitle>
+        <DialogContent>
+          <Typography>{i18n.t("chatIndex.deleteGroupConfirm")}</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteModalOpen(false)} color="secondary">
+            {i18n.t("chatIndex.cancel")}
+          </Button>
+          <Button onClick={handleDeleteSubmit} color="primary">
+            {i18n.t("chatIndex.delete")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={forwardModalOpen}
+        onClose={() => setForwardModalOpen(false)}
+      >
+        <DialogTitle>Encaminhar Mensagem</DialogTitle>
+        <DialogContent>
+          <FormControl fullWidth margin="dense">
+            <InputLabel>Selecione o chat</InputLabel>
+            <Select
+              value={selectedChatForForward || ""}
+              onChange={(e) => setSelectedChatForForward(e.target.value)}
+            >
+              {chats.map((chat) => (
+                <MenuItem key={chat.id} value={chat.id}>
+                  {chat.isGroup
+                    ? chat.title
+                    : chat.users.find((u) => u.userId !== user.id)?.user?.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setForwardModalOpen(false)} color="secondary">
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleForwardSubmit}
+            color="primary"
+            disabled={!selectedChatForForward}
+          >
+            Encaminhar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

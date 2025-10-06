@@ -34,7 +34,7 @@ import TableRowSkeleton from "../../components/TableRowSkeleton";
 import TagModal from "../../components/TagModal";
 import ConfirmationModal from "../../components/ConfirmationModal";
 import toastError from "../../errors/toastError";
-import { Chip, Tooltip } from "@material-ui/core";
+import { Chip } from "@material-ui/core";
 import { AuthContext } from "../../context/Auth/AuthContext";
 import { MoreHoriz } from "@material-ui/icons";
 import ContactTagListModal from "../../components/ContactTagListModal";
@@ -91,23 +91,26 @@ const Tags = () => {
   const pageNumberRef = useRef(1);
 
   useEffect(() => {
-    const fetchMoreTags = async () => {
-      try {
-        const { data } = await api.get("/tags/", {
-          params: { searchParam, pageNumber, kanban: 0 },
-        });
-        dispatch({ type: "LOAD_TAGS", payload: data.tags });
-        setHasMore(data.hasMore);
-        setLoading(false);
-      } catch (err) {
-        toastError(err);
-      }
-    };
+    const delayDebounceFn = setTimeout(() => {
+      const fetchMoreTags = async () => {
+        try {
+          const { data } = await api.get("/tags/", {
+            params: { searchParam, pageNumber, kanban: 0 },
+          });
+          dispatch({ type: "LOAD_TAGS", payload: data.tags });
+          setHasMore(data.hasMore);
+          setLoading(false);
+        } catch (err) {
+          toastError(err);
+        }
+      };
 
-    if (pageNumber > 0) {
-      setLoading(true);
-      fetchMoreTags();
-    }
+      if (pageNumber > 0) {
+        setLoading(true);
+        fetchMoreTags();
+      }
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
   }, [searchParam, pageNumber]);
 
   useEffect(() => {

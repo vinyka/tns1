@@ -145,6 +145,7 @@ const FlowBuilderAddImgModal = ({ open, onSave, onUpdate, data, close }) => {
       });
 
       setTimeout(async () => {
+        console.log(formData);
         await api.post("/flowbuilder/img", formData).then(res => {
           handleClose();
           onSave({

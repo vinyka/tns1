@@ -5,7 +5,6 @@ import ContactListItem from "../../models/ContactListItem";
 import CheckContactNumber from "../WbotServices/CheckNumber";
 import logger from "../../utils/logger";
 import Contact from "../../models/Contact";
-// import CheckContactNumber from "../WbotServices/CheckNumber";
 
 export async function ImportContactsService(
   companyId: number,

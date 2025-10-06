@@ -5,6 +5,9 @@ import Tag from '../models/Tag'
 import { getIO } from "../libs/socket";
 import Ticket from "../models/Ticket";
 import ShowTicketService from "../services/TicketServices/ShowTicketService";
+import { isNil } from "lodash";
+import SendWhatsAppMessage from "../services/WbotServices/SendWhatsAppMessage";
+import { sendFacebookMessage } from "../services/FacebookServices/sendFacebookMessage";
 
 export const store = async (req: Request, res: Response): Promise<Response> => {
   const { ticketId, tagId } = req.params;
@@ -12,6 +15,26 @@ export const store = async (req: Request, res: Response): Promise<Response> => {
 
   try {
     const ticketTag = await TicketTag.create({ ticketId, tagId });
+
+    if (ticketTag) {
+      const nextTag = await Tag.findOne({ where: { id: tagId } });
+      if (!isNil(nextTag.greetingMessageLane) && nextTag.greetingMessageLane !== "") {
+        const ticketUpdate = await ShowTicketService(ticketId, companyId);
+        const bodyMessage = ticketUpdate.user ? `*${ticketUpdate.user.name}:*\n${nextTag.greetingMessageLane}` : nextTag.greetingMessageLane;
+
+        if (ticketUpdate.channel === "whatsapp") {
+          await SendWhatsAppMessage({ body: bodyMessage, ticket: ticketUpdate });
+        }
+
+        if (["facebook", "instagram"].includes(ticketUpdate.channel)) {
+          try {
+            await sendFacebookMessage({ body: `\u200e ${bodyMessage}`, ticket: ticketUpdate});
+          } catch (error) {
+            console.log("error", error);
+          }
+        }
+      }
+    }
 
     const ticket = await ShowTicketService(ticketId, companyId);
 

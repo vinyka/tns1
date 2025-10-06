@@ -23,7 +23,7 @@ import { isNil, isNull, head } from "lodash";
 import FindOrCreateATicketTrakingService from "../TicketServices/FindOrCreateATicketTrakingService";
 import { handleMessageIntegration, handleRating, verifyRating } from "../WbotServices/wbotMessageListener";
 import CompaniesSettings from "../../models/CompaniesSettings";
-import sendFacebookMessage from "./sendFacebookMessage";
+import { sendFacebookMessage } from "./sendFacebookMessage";
 import { Mutex } from "async-mutex";
 import TicketTag from "../../models/TicketTag";
 import Tag from "../../models/Tag";
@@ -90,17 +90,25 @@ export interface ReplyTo {
 const verifyContact = async (msgContact: any, token: any, companyId: any) => {
   if (!msgContact) return null;
 
+  let profilePicUrl = null;
+
+  if (msgContact.profile_pic) {
+    profilePicUrl = msgContact.profile_pic
+  } else {
+    profilePicUrl = `${process.env.FRONTEND_URL}/nopicture.png`;
+  }
+
   const contactData = {
     name: msgContact?.name || `${msgContact?.first_name} ${msgContact?.last_name}`,
     number: msgContact.id,
-    profilePicUrl: msgContact.profile_pic,
+    profilePicUrl,
     isGroup: false,
     companyId: companyId,
     channel: token.channel,
     whatsappId: token.id
   };
 
-  const contact = await CreateOrUpdateContactService(contactData);
+  const contact = CreateOrUpdateContactService(contactData);
 
   return contact;
 };
@@ -114,12 +122,12 @@ export const verifyMessageFace = async (
 ) => {
   const quotedMsg = await verifyQuotedMessage(msg);
   const messageData = {
-    wid: msg.mid || msg.message_id,
+    wid: msg?.mid || msg?.message_id,
     ticketId: ticket.id,
-    contactId: fromMe ? undefined : msg.is_echo ? undefined : contact.id,
-    body: msg.text || body,
-    fromMe: fromMe ? fromMe : msg.is_echo ? true : false,
-    read: fromMe ? fromMe : msg.is_echo,
+    contactId: fromMe ? undefined : msg?.is_echo ? undefined : contact.id,
+    body: msg?.text || body,
+    fromMe: fromMe ? fromMe : msg?.is_echo ? true : false,
+    read: fromMe ? fromMe : msg?.is_echo,
     quotedMsgId: quotedMsg?.id,
     ack: 3,
     dataJson: JSON.stringify(msg),
@@ -510,7 +518,6 @@ export const handleMessage = async (
 
       const contact = await verifyContact(msgContact, token, companyId);
 
-
       const unreadCount = fromMe ? 0 : 1;
 
       const getSession = await Whatsapp.findOne({
@@ -775,7 +782,7 @@ export const handleMessage = async (
               // await delay(1000);
 
               const bodyBot = formatBody(
-                `\u200eEstou ciente sobre o tratamento dos meus dados pessoais. \n\n[1] Sim\n[2] Não`,
+                `\u200eEstou ciente sobre o tratamento dos meus dados pessoais. \n\n*[1]* Sim\n*[2]* Não`,
                 ticket
               );
 
@@ -825,9 +832,6 @@ export const handleMessage = async (
         isMenu = flow.flow["nodes"].find((node: any) => node.id === ticket.lastFlowId)?.type === "menu";
       }
 
-
-      console.log({ ticket })
-
       if (
         !ticket.fromMe &&
         isMenu &&
@@ -840,8 +844,6 @@ export const handleMessage = async (
 
         await flowBuilderQueue(ticket, message, getSession, companyId, contact, isFirstMsg)
       }
-
-
 
       if (
         !ticket.imported &&
@@ -878,9 +880,6 @@ export const handleMessage = async (
 
       }
 
-
-
-
       if (
         !ticket.queue &&
         !fromMe &&
@@ -901,7 +900,6 @@ export const handleMessage = async (
           );
         }
       }
-
     }
 
     return;
@@ -952,14 +950,12 @@ const verifyQueue = async (
   const choosenQueue = queues[+selectedOption - 1];
 
   if (choosenQueue) {
-    console.log(585, "facebookMessageListener")
 
     await UpdateTicketService({
       ticketData: { queueId: choosenQueue.id },
       ticketId: ticket.id,
       companyId: ticket.companyId
     });
-
 
     if (choosenQueue.chatbots.length > 0) {
       let options = "";

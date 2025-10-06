@@ -20,9 +20,9 @@ interface PlanData {
   trialDays?: number;
   recurrence?: string;
   useOpenAi?: boolean;
-  useAudioTranscription?: boolean;
   useIntegrations?: boolean;
   isPublic?: boolean;
+  useWhatsappOfficial?: boolean;
 }
 
 const CreatePlanService = async (planData: PlanData): Promise<Plan> => {

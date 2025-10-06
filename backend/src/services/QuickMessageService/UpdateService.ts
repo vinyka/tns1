@@ -8,12 +8,13 @@ interface Data {
   id?: number | string;
   geral: boolean;
   mediaPath?: string | null;
+  mediaName?: string | null;
+  mediaType?: string | null;
   visao: boolean;
-
 }
 
 const UpdateService = async (data: Data): Promise<QuickMessage> => {
-  const { id, shortcode, message, userId, geral, mediaPath, visao } = data;
+  const { id, shortcode, message, userId, geral, mediaPath, mediaName, mediaType, visao } = data;
 
   const record = await QuickMessage.findByPk(id);
 
@@ -28,9 +29,10 @@ const UpdateService = async (data: Data): Promise<QuickMessage> => {
   await record.update({
     shortcode,
     message,
-    // userId,
     geral,
     mediaPath,
+    mediaName,
+    mediaType,
     visao
   });
 

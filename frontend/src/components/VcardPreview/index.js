@@ -9,13 +9,11 @@ import Grid from "@material-ui/core/Grid";
 
 import { AuthContext } from "../../context/Auth/AuthContext";
 
-import { Button, Divider, useTheme, } from "@material-ui/core";
+import { Button, Divider } from "@material-ui/core";
 import { isNil } from 'lodash';
 import ShowTicketOpen from '../ShowTicketOpenModal';
-import { grey } from '@material-ui/core/colors';
 
-const VcardPreview = ({ contact, numbers, queueId, whatsappId }) => {
-    const theme = useTheme();
+const VcardPreview = ({ contact, numbers, queueId, whatsappId, channel }) => {
     const history = useHistory();
     const { user } = useContext(AuthContext);
 
@@ -31,6 +29,7 @@ const VcardPreview = ({ contact, numbers, queueId, whatsappId }) => {
         number: 0,
         profilePicUrl: ""
     });
+
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
             const fetchContacts = async () => {
@@ -39,19 +38,17 @@ const VcardPreview = ({ contact, numbers, queueId, whatsappId }) => {
                         return
                     }
                     const number = numbers.replace(/\D/g, "");
-                    
-                    const getData = await api.get(`/contacts/profile/${number}`);
+                    const getData = await api.get(`/contacts/profile/${number}`, { params: { channel: channel } });
 
                     if (getData.data.contactId && getData.data.contactId !== 0) {
                         let obj = {
                             id: getData.data.contactId,
                             name: contact,
                             number: numbers,
-                            profilePicUrl: getData.data.urlPicture
+                            urlPicture: getData.data.urlPicture
                         }
 
                         setContact(obj)
-                  
                     } else {
                         let contactObj = {
                             name: contact,
@@ -63,7 +60,7 @@ const VcardPreview = ({ contact, numbers, queueId, whatsappId }) => {
                         const { data } = await api.post("/contacts", contactObj);
                         setContact(data)
                     }
-            
+
                 } catch (err) {
                     console.log(err)
                     toastError(err);
@@ -98,8 +95,8 @@ const VcardPreview = ({ contact, numbers, queueId, whatsappId }) => {
 
             if (ticket.userId !== user?.id) {
                 setOpenAlert(true);
-                setUserTicketOpen(ticket.user.name);
-                setQueueTicketOpen(ticket.queue.name);
+                setUserTicketOpen(ticket?.user?.name);
+                setQueueTicketOpen(ticket?.queue?.name);
             } else {
                 setOpenAlert(false);
                 setUserTicketOpen("");

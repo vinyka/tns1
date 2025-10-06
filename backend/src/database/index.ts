@@ -46,12 +46,19 @@ import ContactWallet from "../models/ContactWallet";
 import ScheduledMessages from "../models/ScheduledMessages";
 import ScheduledMessagesEnvio from "../models/ScheduledMessagesEnvio";
 import Versions from "../models/Versions";
+import QuickMessageComponent from "../models/QuickMessageComponent";
+import BirthdaySettings from "../models/BirthdaySettings";
 import { FlowDefaultModel } from "../models/FlowDefault";
 import { FlowBuilderModel } from "../models/FlowBuilder";
 import { FlowAudioModel } from "../models/FlowAudio";
+import { FlowDocModel } from "../models/FlowDoc";
 import { FlowCampaignModel } from "../models/FlowCampaign";
 import { FlowImgModel } from "../models/FlowImg";
 import { WebhookModel } from "../models/Webhook";
+import QueueState from "../models/QueueStates";
+import TicketFinalizationReason from "../models/TicketFinalizationReason";
+import PresetWebhookModel from "../models/PresetWebhook";
+import WhatsappLidMap from "../models/WhatsapplidMap";
 
 // eslint-disable-next-line
 const dbConfig = require("../config/database");
@@ -106,12 +113,19 @@ const models = [
   ScheduledMessages,
   ScheduledMessagesEnvio,
   Versions,
+  QuickMessageComponent,
   FlowDefaultModel,
   FlowBuilderModel,
   FlowAudioModel,
   FlowCampaignModel,
   FlowImgModel,
-  WebhookModel
+  FlowDocModel,
+  WebhookModel,
+  QueueState,
+  TicketFinalizationReason,
+  PresetWebhookModel,
+  BirthdaySettings,
+  WhatsappLidMap
 ];
 
 sequelize.addModels(models);

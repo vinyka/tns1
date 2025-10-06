@@ -1,4 +1,4 @@
-  import React, { useState, useContext } from "react";
+import React, { useState, useContext } from "react";
 
 import MenuItem from "@material-ui/core/MenuItem";
 
@@ -8,7 +8,6 @@ import ConfirmationModal from "../ConfirmationModal";
 import { Menu } from "@material-ui/core";
 import { ReplyMessageContext } from "../../context/ReplyingMessage/ReplyingMessageContext";
 import { ForwardMessageContext } from "../../context/ForwarMessage/ForwardMessageContext";
-import InformationModal from "../InformationModal";
 import { EditMessageContext } from "../../context/EditingMessage/EditingMessageContext";
 
 import { TicketsContext } from "../../context/Tickets/TicketsContext";
@@ -17,7 +16,7 @@ import { TicketsContext } from "../../context/Tickets/TicketsContext";
 import toastError from "../../errors/toastError";
 import { useHistory } from "react-router-dom";
 import { AuthContext } from "../../context/Auth/AuthContext";
-import ForwardModal from "../ForwardMessageModal";
+import ForwardModal from "../../components/ForwardMessageModal";
 import ShowTicketOpen from "../ShowTicketOpenModal";
 import AcceptTicketWithoutQueue from "../AcceptTicketWithoutQueueModal";
 
@@ -44,10 +43,6 @@ const MessageOptionsMenu = ({
   const [acceptTicketWithouSelectQueueOpen, setAcceptTicketWithouSelectQueueOpen] = useState(false);
 
   const [ticketOpen, setTicketOpen] = useState(null);
-
-  // Transcrição de áudio
-  const [showTranscribedText, setShowTranscribedText] = useState(false);
-  const [audioMessageTranscribeToText, setAudioMessageTranscribeToText] = useState("");
 
   const { showSelectMessageCheckbox,
     setShowSelectMessageCheckbox,
@@ -131,37 +126,6 @@ const MessageOptionsMenu = ({
   //   handleClose();
   // };
 
-  // Transcrever áudio (OpenAI Whisper via backend)
-  const handleTranscriptionAudioToText = async () => {
-    try {
-      const audioUrl = String(message.mediaUrl || "");
-      const match = audioUrl.match(/\/([^\/]+\.ogg)$/);
-      const extractedPart = match ? match[1] : null;
-      if (!extractedPart) {
-        throw new Error("Formato de URL de áudio inesperado");
-      }
-      const response = await api.get(`/messages/transcribeAudio/${extractedPart}`);
-      const { data } = response;
-      if (data && typeof data.transcribedText === "string") {
-        setAudioMessageTranscribeToText(data.transcribedText);
-        setShowTranscribedText(true);
-        handleClose();
-      } else if (data && data.error) {
-        throw new Error(data.error);
-      } else {
-        throw new Error("Dados de transcrição inválidos");
-      }
-    } catch (err) {
-      // Mostrar mensagem específica quando o recurso não está disponível no plano
-      const status = err?.response?.status;
-      if (status === 403) {
-        toastError("Recurso não disponível no seu plano. Faça um upgrade para habilitar a transcrição de áudio.");
-        return;
-      }
-      toastError(err?.response?.data?.error || err.message || "Erro desconhecido");
-    }
-  };
-
   const hanldeReplyMessage = () => {
     setReplyingMessage(message);
     handleClose();
@@ -212,18 +176,9 @@ const MessageOptionsMenu = ({
           setShowSelectMessageCheckbox(false);
         }}
       />
-      <InformationModal
-        title={i18n.t("Transcrição de áudio")}
-        open={showTranscribedText}
-        onClose={setShowTranscribedText}
-      >
-        {audioMessageTranscribeToText}
-      </InformationModal>
       <Menu
         anchorEl={anchorEl}
         getContentAnchorEl={null}
-        keepMounted
-        anchorReference="anchorEl"
         anchorOrigin={{
           vertical: "bottom",
           horizontal: "right",
@@ -251,11 +206,6 @@ const MessageOptionsMenu = ({
         <MenuItem onClick={handleSetShowSelectCheckbox}>
           {i18n.t("messageOptionsMenu.forward")}
         </MenuItem>
-        {(message.mediaType === "audio" && !message.fromMe) && (
-          <MenuItem onClick={handleTranscriptionAudioToText}>
-            {i18n.t("Transcrever áudio")}
-          </MenuItem>
-        )}
         {!message.fromMe && isGroup && (
           <MenuItem onClick={() => handleSaveTicket(message?.contact?.id)}>
             {i18n.t("messageOptionsMenu.talkTo")}

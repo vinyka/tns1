@@ -1,3 +1,4 @@
+// src/services/AnnouncementService/ListService.ts - Atualização
 import { Op, fn, col, where } from "sequelize";
 import { isEmpty } from "lodash";
 import Announcement from "../../models/Announcement";
@@ -5,6 +6,7 @@ import Announcement from "../../models/Announcement";
 interface Request {
   searchParam?: string;
   pageNumber?: string;
+  userCompanyId?: number; // 🎯 NOVO PARÂMETRO
 }
 
 interface Response {
@@ -15,22 +17,42 @@ interface Response {
 
 const ListService = async ({
   searchParam = "",
-  pageNumber = "1"
+  pageNumber = "1",
+  userCompanyId
 }: Request): Promise<Response> => {
   let whereCondition: any = {
-    status: true
+    [Op.or]: [
+      { expiresAt: null }, // Informativos sem expiração
+      { expiresAt: { [Op.gt]: new Date() } } // Informativos não expirados
+    ]
   };
+
+  // 🎯 FILTRO POR EMPRESA
+  if (userCompanyId) {
+    whereCondition = {
+      ...whereCondition,
+      [Op.or]: [
+        { targetCompanyId: null }, // Informativos globais
+        { targetCompanyId: userCompanyId } // Informativos específicos da empresa
+      ]
+    };
+  }
 
   if (!isEmpty(searchParam)) {
     whereCondition = {
       ...whereCondition,
-      [Op.or]: [
+      [Op.and]: [
+        whereCondition,
         {
-          title: where(
-            fn("LOWER", col("Announcement.title")),
-            "LIKE",
-            `%${searchParam.toLowerCase().trim()}%`
-          )
+          [Op.or]: [
+            {
+              title: where(
+                fn("LOWER", col("Announcement.title")),
+                "LIKE",
+                `%${searchParam.toLowerCase().trim()}%`
+              )
+            }
+          ]
         }
       ]
     };
@@ -43,7 +65,14 @@ const ListService = async ({
     where: whereCondition,
     limit,
     offset,
-    order: [["createdAt", "DESC"]]
+    order: [
+      ['priority', 'ASC'],
+      ['createdAt', 'DESC']
+    ],
+    include: [
+      { model: require("../../models/Company").default, as: "company", attributes: ["id", "name"] },
+      { model: require("../../models/Company").default, as: "targetCompany", attributes: ["id", "name"] }
+    ]
   });
 
   const hasMore = count > offset + records.length;

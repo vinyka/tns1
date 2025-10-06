@@ -1,10 +1,15 @@
 import io from "socket.io-client";
+import api from "../services/api";
+
 
 class SocketWorker {
   constructor(companyId , userId) {
+    const sessionToken = api.defaults.headers.Authorization
+
     if (!SocketWorker.instance) {
       this.companyId = companyId
       this.userId = userId
+      this.token = sessionToken
       this.socket = null;
       this.configureSocket();
       this.eventListeners = {}; // Armazena os ouvintes de eventos registrados
@@ -21,19 +26,25 @@ class SocketWorker {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: Infinity,
-      query: { userId: this.userId }
+      // transports: ["websocket", "polling", "flashsocket"],
+      // pingTimeout: 18000,
+      // pingInterval: 18000,
+      query: { userId: this.userId, token: this.token }
     });
 
     this.socket.on("connect", () => {
+      console.log("Conectado ao servidor Socket.IO");
     });
 
     this.socket.on("disconnect", () => {
+      console.log("Desconectado do servidor Socket.IO");
       this.reconnectAfterDelay();
     });
   }
 
   // Adiciona um ouvinte de eventos
   on(event, callback) {
+
     this.connect();
     this.socket.on(event, callback);
 
@@ -52,18 +63,22 @@ class SocketWorker {
 
   // Desconecta um ou mais ouvintes de eventos
   off(event, callback) {
+    // console.log(event, callback)
     this.connect();
     if (this.eventListeners[event]) {
+      // console.log("Desconectando do servidor Socket.IO:", event, callback);
       if (callback) {
         // Desconecta um ouvinte específico
         this.socket.off(event, callback);
         this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
       } else {
+        // console.log("DELETOU EVENTOS DO SOCKET:", this.eventListeners[event]);
 
         // Desconecta todos os ouvintes do evento
         this.eventListeners[event].forEach(cb => this.socket.off(event, cb));
         delete this.eventListeners[event];
       }
+      // console.log("EVENTOS DO SOCKET:", this.eventListeners);
     }
   }
 
@@ -72,12 +87,14 @@ class SocketWorker {
       this.socket.disconnect();
       this.socket = null
       this.instance = null
+      console.log("Socket desconectado manualmente");
     }
   }
 
   reconnectAfterDelay() {
     setTimeout(() => {
       if (!this.socket || !this.socket.connected) {
+        console.log("Tentando reconectar após desconexão");
         this.connect();
       }
     }, 1000);

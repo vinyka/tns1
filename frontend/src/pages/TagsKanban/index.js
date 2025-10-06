@@ -100,7 +100,6 @@ const Tags = () => {
   //   const socketManager = useContext(SocketContext);
   const { user, socket } = useContext(AuthContext);
 
-
   const [loading, setLoading] = useState(false);
   const [pageNumber, setPageNumber] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -205,7 +204,9 @@ const Tags = () => {
   return (
     <MainContainer>
       <ConfirmationModal
-        title={deletingTag && `${i18n.t("tagsKanban.confirmationModal.deleteTitle")}`}
+        title={
+          deletingTag && `${i18n.t("tagsKanban.confirmationModal.deleteTitle")}`
+        }
         open={confirmModalOpen}
         onClose={setConfirmModalOpen}
         onConfirm={() => handleDeleteTag(deletingTag.id)}
@@ -222,7 +223,9 @@ const Tags = () => {
         />
       )}
       <MainHeader>
-        <Title>{i18n.t("tagsKanban.title")} ({tags.length})</Title>
+        <Title>
+          {i18n.t("tagsKanban.title")} ({tags.length})
+        </Title>
         <MainHeaderButtonsWrapper>
           <TextField
             placeholder={i18n.t("contacts.searchPlaceholder")}
@@ -249,7 +252,7 @@ const Tags = () => {
             color="primary"
             onClick={handleReturnToKanban}
           >
-            {'Voltar para o Kanban'}
+            {i18n.t("tagsKanban.backToKanban")}
           </Button>
         </MainHeaderButtonsWrapper>
       </MainHeader>
@@ -261,9 +264,15 @@ const Tags = () => {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell align="center">{i18n.t("tagsKanban.table.name")}</TableCell>
-              <TableCell align="center">{i18n.t("tagsKanban.table.tickets")}</TableCell>
-              <TableCell align="center">{i18n.t("tagsKanban.table.actions")}</TableCell>
+              <TableCell align="center">
+                {i18n.t("tagsKanban.table.name")}
+              </TableCell>
+              <TableCell align="center">
+                {i18n.t("tagsKanban.table.tickets")}
+              </TableCell>
+              <TableCell align="center">
+                {i18n.t("tagsKanban.table.actions")}
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -282,7 +291,13 @@ const Tags = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell align="center">{tag?.ticketTags ? (<span>{tag?.ticketTags?.length}</span>) : <span>0</span>}</TableCell>
+                  <TableCell align="center">
+                    {tag?.ticketTags ? (
+                      <span>{tag?.ticketTags?.length}</span>
+                    ) : (
+                      <span>0</span>
+                    )}
+                  </TableCell>
                   <TableCell align="center">
                     <IconButton size="small" onClick={() => handleEditTag(tag)}>
                       <EditIcon />

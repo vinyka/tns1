@@ -9,10 +9,11 @@ import TextField from "@mui/material/TextField";
 import { useNodeStorage } from "../../../stores/useNodeStorage";
 import { Handle } from "react-flow-renderer";
 import { Typography, Box } from "@material-ui/core";
-import typebotIcon from "../../../assets/typebot-ico.png";
+import typebotIcon from "../../../assets/typebot.jpg";
 
 export default memo(({ data, isConnectable, id }) => {
   const storageItems = useNodeStorage();
+  console.log(12, "ticketNode", data);
   return (
     <div
       style={{
@@ -27,13 +28,14 @@ export default memo(({ data, isConnectable, id }) => {
         type="target"
         position="left"
         style={{
-          background: "#FF7606",
+          background: "#0872b9",
           width: "18px",
           height: "18px",
           top: "20px",
           left: "-12px",
           cursor: "pointer",
         }}
+        onConnect={(params) => console.log("handle onConnect", params)}
         isConnectable={isConnectable}
       >
         <ArrowForwardIos
@@ -43,7 +45,7 @@ export default memo(({ data, isConnectable, id }) => {
             height: "10px",
             marginLeft: "2.9px",
             marginBottom: "1px",
-            pointerEvents: "none",
+            pointerEvents: "none"
           }}
         />
       </Handle>
@@ -113,7 +115,7 @@ export default memo(({ data, isConnectable, id }) => {
         position="right"
         id="a"
         style={{
-          background: "#FF7606",
+          background: "#0872b9",
           width: "18px",
           height: "18px",
           top: "70%",
@@ -122,14 +124,14 @@ export default memo(({ data, isConnectable, id }) => {
         }}
         isConnectable={isConnectable}
       >
-        <ArrowForwardIos
+       <ArrowForwardIos
           sx={{
             color: "#ffff",
             width: "10px",
             height: "10px",
             marginLeft: "2.9px",
             marginBottom: "1px",
-            pointerEvents: "none",
+            pointerEvents: "none"
           }}
         />
       </Handle>

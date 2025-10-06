@@ -28,7 +28,6 @@ import TicketTag from "./TicketTag";
 import QueueIntegrations from "./QueueIntegrations";
 import { format } from "date-fns";
 
-
 @Table
 class Ticket extends Model<Ticket> {
   @PrimaryKey
@@ -41,21 +40,6 @@ class Ticket extends Model<Ticket> {
 
   @Column
   unreadMessages: number;
-
-  @Column
-  flowWebhook: boolean;
-
-  @Column
-  lastFlowId: string;
-
-  @Column
-  hashFlowId: string;
-
-  @Column
-  flowStopped: string;
-
-  @Column(DataType.JSON)
-  dataWebhook: {} | null;;
 
   @Column
   lastMessage: string;
@@ -181,10 +165,43 @@ class Ticket extends Model<Ticket> {
 
   @Default(false)
   @Column
-  typebotStatus: boolean
+  typebotStatus: boolean;
 
   @Column
-  typebotSessionTime: Date
+  typebotSessionTime: Date;
+
+  @Column
+  flowWebhook: boolean;
+
+  @Column
+  lastFlowId: string;
+
+  @Column
+  hashFlowId: string;
+
+  @Column
+  flowStopped: string;
+
+  @Column(DataType.JSON)
+  dataWebhook: {} | null;
+
+  @AllowNull(false)
+  @Default(0)
+  @Column
+  maxUseInactiveTime: number;
+
+  @Column({ type: DataType.FLOAT, allowNull: true })
+  valorVenda: number | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  motivoNaoVenda: string | null;
+
+  @Column({ type: DataType.STRING, allowNull: true })
+  motivoFinalizacao: string | null;
+
+  @Default(false)
+  @Column
+  finalizadoComVenda: boolean;
 }
 
 export default Ticket;

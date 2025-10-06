@@ -27,8 +27,6 @@ export const webHook = async (
 ): Promise<Response> => {
   try {
     const { body } = req;
-    console.log(30, "WebHookController", { body })
-
     if (body.object === "page" || body.object === "instagram") {
       let channel: string;
 

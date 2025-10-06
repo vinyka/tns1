@@ -18,9 +18,12 @@ interface PlanData {
   useExternalApi?: boolean;
   useKanban?: boolean;
   useOpenAi?: boolean;
-  useAudioTranscription?: boolean;
   useIntegrations?: boolean;
   isPublic?: boolean;
+  useWhatsappOfficial?: boolean;
+  trial?: boolean;
+  trialDays?: number;
+  recurrence?: string;
 }
 
 const UpdatePlanService = async (planData: PlanData): Promise<Plan> => {

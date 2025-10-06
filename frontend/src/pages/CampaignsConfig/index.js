@@ -100,6 +100,7 @@ const CampaignsConfig = () => {
   useEffect(() => {
     api.get("/campaign-settings").then(({ data }) => {
       const settingsList = [];
+      console.log(data)
       if (Array.isArray(data) && data.length > 0) {
         data.forEach((item) => {
           settingsList.push([item.key, item.value]);
@@ -194,7 +195,7 @@ const CampaignsConfig = () => {
         {i18n.t("campaigns.confirmationModal.deleteMessage")}
       </ConfirmationModal>
       {
-        user.profile === "user" ?
+        user.profile === "user" && user?.showCampaign === "disabled" ?
           <ForbiddenPage />
           :
           <>

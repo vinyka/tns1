@@ -91,6 +91,7 @@ const FlowBuilderTypebotModal = ({ open, onSave, data, onUpdate, close }) => {
         title: "Editar Typebot ao fluxo",
         btn: "Salvar",
       });
+      console.log("FlowTybebotEdit", data);
       setIntegration({
         ...data.data.typebotIntegration,
       });

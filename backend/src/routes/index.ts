@@ -37,7 +37,9 @@ import apiCompanyRoutes from "./api/apiCompanyRoutes";
 import apiContactRoutes from "./api/apiContactRoutes";
 import apiMessageRoutes from "./api/apiMessageRoutes";
 import companySettingsRoutes from "./companySettingsRoutes";
-
+import ticketFinalizationReasonRoutes from "./ticketFinalizationReasonRoutes";
+import presetWebhookRoutes from "./presetWebhookRoutes";
+import birthdayRoutes from "./birthdayRoutes";
 import promptRoutes from "./promptRouter";
 import statisticsRoutes from "./statisticsRoutes";
 import scheduleMessageRoutes from "./ScheduledMessagesRoutes";
@@ -46,6 +48,7 @@ import webHook from "./webHookRoutes";
 import flowBuilder from "./flowBuilderRoutes";
 import flowCampaignRoutes from "./flowCampaignRoutes";
 
+import ChatController from "../controllers/ChatController";
 
 const routes = Router();
 
@@ -66,6 +69,7 @@ routes.use(ticketNoteRoutes);
 routes.use(quickMessageRoutes);
 routes.use(helpRoutes);
 routes.use(dashboardRoutes);
+routes.use(birthdayRoutes);
 routes.use(scheduleRoutes);
 routes.use(tagRoutes);
 routes.use(contactListRoutes);
@@ -86,16 +90,18 @@ routes.use(ticketTagRoutes);
 routes.use("/api", apiCompanyRoutes);
 routes.use("/api", apiContactRoutes);
 routes.use("/api", apiMessageRoutes);
-
-routes.use(flowDefaultRoutes);
-routes.use(webHook)
-routes.use(flowBuilder)
-routes.use(flowCampaignRoutes)
-
-
+routes.use(presetWebhookRoutes);
 routes.use(promptRoutes);
 routes.use(statisticsRoutes);
 routes.use(companySettingsRoutes);
+routes.use(ticketFinalizationReasonRoutes);
 routes.use(scheduleMessageRoutes);
+
+routes.use(flowDefaultRoutes);
+routes.use(webHook);
+routes.use(flowBuilder);
+routes.use(flowCampaignRoutes);
+
+routes.post("/chats/backfill", ChatController.backfillChats);
 
 export default routes;
